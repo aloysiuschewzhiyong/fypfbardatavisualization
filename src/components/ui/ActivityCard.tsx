@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getProfilePictureURL, getUserData, getCampaignDetailsRealtime } from '@/app/firebase';
 import { Timestamp } from 'firebase/firestore'; // Import the Timestamp type
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Image from 'next/image';
 
 export type AuditProps = {
   uid: string;
@@ -82,7 +83,7 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
       <section className="flex justify-between gap-3 items-center">
         <div className="h-12 w-12 rounded-full bg-gray-100 p-1">
           {profilePictureURL ? (
-            <img loading="lazy" width={350} height={350} src={profilePictureURL} alt="avatar" className="rounded-full" />
+            <Image loading="lazy" width={350} height={350} src={profilePictureURL} alt="avatar" className="rounded-full" />
           ) : (
             <div className="h-full w-full flex items-center justify-center text-gray-400">No Image</div>
           )}
