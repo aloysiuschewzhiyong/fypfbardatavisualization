@@ -7,6 +7,7 @@ import { getUserData, checkAuthState, getProfilePictureURL, getAuditInfoRealtime
 import { User } from 'firebase/auth';
 import { AuditProps } from '@/components/ui/ActivityCard';
 import ActivityCard from '@/components/ui/ActivityCard';
+import { Timestamp } from 'firebase/firestore'; // Import the Timestamp type
 import { Button } from '@/components/ui/button';
 import {
   Pagination,
@@ -42,12 +43,20 @@ export default function AuditPage({}: Props) {
     const listenToAuditData = () => {
       getAuditInfoRealtime((audits: AuditData[]) => {
         console.log(audits);
-        const mappedAudits: AuditProps[] = audits.map(audit => ({
-          uid: audit.user,
-          action: audit.action,
-          object: audit.object,
-          timestamp: audit.time // Assuming audit.time contains the timestamp
-        }));
+        const mappedAudits: AuditProps[] = audits.map(audit => {
+          let timestamp: Timestamp;
+          if (audit.time instanceof Date) {
+            timestamp = Timestamp.fromDate(audit.time);
+          } else {
+            timestamp = audit.time; // Assuming audit.time is already a Timestamp
+          }
+          return {
+            uid: audit.user,
+            action: audit.action,
+            object: audit.object,
+            timestamp: timestamp
+          };
+        });
         setAuditData(mappedAudits);
       });
     };

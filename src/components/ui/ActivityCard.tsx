@@ -82,15 +82,6 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
       <section className="flex justify-between gap-3 items-center">
         <div className="h-12 w-12 rounded-full bg-gray-100 p-1">
           {profilePictureURL ? (
-      //    <Avatar>
-      //    <AvatarImage
-      //      src={
-      //        profilePictureURL ||
-      //        "https://t3.ftcdn.net/jpg/05/16/27/58/360_F_516275801_f3Fsp17x6HQK0xQgDQEELoTuERO4SsWV.jpg"
-      //      }
-      //    />
-      //    <AvatarFallback>CN</AvatarFallback>
-      //  </Avatar>
             <img loading="lazy" width={350} height={350} src={profilePictureURL} alt="avatar" className="rounded-full" />
           ) : (
             <div className="h-full w-full flex items-center justify-center text-gray-400">No Image</div>
