@@ -1,113 +1,228 @@
-import Image from "next/image";
+"use client";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { DollarSign, Users, CreditCard, Ticket } from "lucide-react";
+import Card, { CardContent, CardProps } from "@/components/ui/CardBruh";
+import {
+  getTotalNotificationReceiversRealtime,
+  getActiveCampaignCounts,
+  getAuditInfoRealtime,
+  getCouponUserCountsRedeemed,
+  AuditData,
+} from "@/app/firebase"; // Adjust the import path as needed
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DashboardGraph from "@/components/ui/DashboardGraph";
+import { OrgChart } from "@/components/ui/OrgChart";
+import CouponChart from "@/components/ui/CouponChart";
+import CampaignChart from "@/components/ui/CampaignGraph";
+import ActivityCard, { AuditProps } from "@/components/ui/ActivityCard";
 
-export default function Home() {
+const HomeContent: React.FC = () => {
+  const router = useRouter();
+  const [totalReceiversCurrentMonth, setTotalReceiversCurrentMonth] = useState<number | null>(null);
+  const [totalReceiversLastMonth, setTotalReceiversLastMonth] = useState<number | null>(null);
+  const [percentageDifference, setPercentageDifference] = useState<number | null>(null);
+  const [activeCampaignsCurrentMonth, setActiveCampaignsCurrentMonth] = useState<number | null>(null);
+  const [activeCampaignsLastMonth, setActiveCampaignsLastMonth] = useState<number | null>(null);
+  const [activeCampaignsPercentageDifference, setActiveCampaignsPercentageDifference] = useState<number | null>(null);
+  const [auditData, setAuditData] = useState<AuditProps[]>([]);
+  const [redeemedCoupons, setRedeemedCoupons] = useState<number | null>(null);
+  const [redeemedCouponsPercentageDifference, setRedeemedCouponsPercentageDifference] = useState<number | null>(null);
+
+  useEffect(() => {
+    getTotalNotificationReceiversRealtime(
+      (totalCurrent, totalLast, percentageDiff) => {
+        setTotalReceiversCurrentMonth(totalCurrent);
+        setTotalReceiversLastMonth(totalLast);
+        setPercentageDifference(percentageDiff);
+      }
+    );
+
+    const fetchActiveCampaignCounts = async () => {
+      try {
+        const campaignCounts = await getActiveCampaignCounts();
+        const now = new Date();
+        const currentMonthName = now.toLocaleString('default', { month: 'short' });
+        const lastMonthName = new Date(now.setMonth(now.getMonth() - 1)).toLocaleString('default', { month: 'short' });
+
+        const currentMonthCampaign = campaignCounts.find(
+          (campaign) => campaign.month === currentMonthName
+        );
+        const lastMonthCampaign = campaignCounts.find(
+          (campaign) => campaign.month === lastMonthName
+        );
+
+        const currentCampaigns = currentMonthCampaign ? currentMonthCampaign.campaigns : 0;
+        const lastCampaigns = lastMonthCampaign ? lastMonthCampaign.campaigns : 0;
+        const percentageDiff = lastCampaigns ? ((currentCampaigns - lastCampaigns) / lastCampaigns * 100) : 0;
+
+        setActiveCampaignsCurrentMonth(currentCampaigns);
+        setActiveCampaignsLastMonth(lastCampaigns);
+        setActiveCampaignsPercentageDifference(percentageDiff);
+      } catch (error) {
+        console.error('Error fetching active campaign counts:', error);
+      }
+    };
+
+    const listenToAuditData = () => {
+      getAuditInfoRealtime((audits: AuditData[]) => {
+        const filteredAudits = audits.slice(0, 4);
+        const mappedAudits: AuditProps[] = filteredAudits.map(audit => ({
+          uid: audit.user,
+          action: audit.action,
+          object: audit.object,
+        }));
+        setAuditData(mappedAudits);
+      });
+    };
+    const fetchRedeemedCoupons = async () => {
+      try {
+        const couponCounts = await getCouponUserCountsRedeemed();
+        const totalRedeemed = Object.values(couponCounts).reduce((acc, count) => acc + count, 0);
+    
+        // Assuming you have the counts for last month to calculate percentage difference
+        // For demonstration, let's assume last month's redeemed coupons count was 0
+        const lastMonthRedeemed = 0; // This should be dynamically fetched or passed
+    
+        let percentageDiff;
+        if (lastMonthRedeemed === 0) {
+          percentageDiff = totalRedeemed > 0 ? 100 : 0; // If last month was zero and this month is greater than zero, show 100% increase
+        } else {
+          percentageDiff = ((totalRedeemed - lastMonthRedeemed) / lastMonthRedeemed) * 100;
+        }
+    
+        setRedeemedCoupons(totalRedeemed);
+        setRedeemedCouponsPercentageDifference(percentageDiff);
+      } catch (error) {
+        console.error("Error fetching redeemed coupons:", error);
+      }
+    };
+    
+
+    fetchActiveCampaignCounts();
+    listenToAuditData();
+    fetchRedeemedCoupons();
+  }, []);
+
+  const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
+
+  const cardData: CardProps[] = [
+    {
+      label: `Coupons Issued in ${currentMonthName}`,
+      amount: totalReceiversCurrentMonth !== null ? totalReceiversCurrentMonth.toString() : "Loading...",
+      description: percentageDifference !== null ? (
+        <>
+          <span className={percentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
+            {percentageDifference.toFixed(1)}%
+          </span>{" "}
+          from last month
+        </>
+      ) : (
+        "Loading..."
+      ),
+      icon: Ticket,
+    },
+    {
+      label: `Coupons Redeemed in ${currentMonthName}`,
+      amount: redeemedCoupons !== null ? redeemedCoupons.toString() : "Loading...",
+      description: redeemedCouponsPercentageDifference !== null ? (
+        <>
+          <span className={redeemedCouponsPercentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
+            {redeemedCouponsPercentageDifference.toFixed(1)}%
+          </span>{" "}
+          from last month
+        </>
+      ) : (
+        "Loading..."
+      ),
+      icon: Ticket,
+    },
+    {
+      label: `Active Campaigns in ${currentMonthName}`,
+      amount: activeCampaignsCurrentMonth !== null ? activeCampaignsCurrentMonth.toString() : "Loading...",
+      description: activeCampaignsPercentageDifference !== null ? (
+        <>
+          <span className={activeCampaignsPercentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
+            {activeCampaignsPercentageDifference.toFixed(1)}%
+          </span>{" "}
+          from last month
+        </>
+      ) : (
+        "Loading..."
+      ),
+      icon: CreditCard,
+    },
+    {
+      label: "Active Users Now",
+      amount: "+573",
+      description: "+201 since last hour",
+      icon: Users,
+    },
+  ];
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+    <div className="flex flex-col gap-5 w-full">
+      <section className="grid w-full grid-cols-1 gap-4 gap-x-4 transition-all sm:grid-cols-2 xl:grid-cols-4">
+        {cardData.map((d, i) => (
+          <Card
+            key={i}
+            amount={d.amount}
+            description={d.description}
+            icon={d.icon}
+            label={d.label}
+          />
+        ))}
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 transition-all lg:grid-cols-2">
+        <CardContent>
+          <section>
+            <p className="font-semibold">Overview</p>
+            <p className="text-sm text-gray-400 mb-0">
+              Some overview content here
+            </p>
+          </section>
+
+          <Tabs defaultValue="campaigns" className="w-full">
+            <TabsList className="flex items-center justify-center flex-wrap h-auto space-y-1">
+              <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+              <TabsTrigger value="issue">Issue</TabsTrigger>
+              <TabsTrigger value="redemption">Redemption</TabsTrigger>
+              <TabsTrigger value="coupons">Coupons</TabsTrigger>
+              <TabsTrigger value="organization">Organization</TabsTrigger>
+            </TabsList>
+            <TabsContent value="redemption"></TabsContent>
+            <TabsContent value="issue">Issue data here.</TabsContent>
+            <TabsContent value="campaigns">
+              <CampaignChart />
+            </TabsContent>
+            <TabsContent value="coupons">
+              <CouponChart />
+            </TabsContent>
+            <TabsContent value="organization">
+              <OrgChart />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+
+        <CardContent className="space-y-1" onClick={() => router.push('/auditLog')}>
+          <section>
+            <p className="font-semibold">App Activity</p>
+            <p className="text-sm text-gray-400 mb-0">Recent app activities</p>
+          </section>
+
+          {auditData.map((d, i) => (
+            <ActivityCard
+              key={i}
+              uid={d.uid}
+              action={d.action}
+              object={d.object}
             />
-          </a>
-        </div>
-      </div>
-
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+          ))}
+        </CardContent>
+      </section>
+    </div>
   );
-}
+};
+
+export default HomeContent;

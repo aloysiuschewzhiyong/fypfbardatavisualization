@@ -1,0 +1,15 @@
+import React from 'react'
+import { cn } from '@/lib/utils'
+
+type Props = {
+    title: string;
+    className?: string;
+}
+
+export default function PageTitle({title, className}: Props) {
+  return (
+    <h1 className={cn("text-2xl font-bold", className)}>
+        {title}
+    </h1>
+  )
+}
