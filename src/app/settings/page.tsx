@@ -74,7 +74,8 @@ export default function SettingsPage({}: Props) {
                 </div>
               )}
             </div>
-            <ProfileForm  />
+            
+            {/* <ProfileForm  /> */}
           </div>
         </CardContent>
 

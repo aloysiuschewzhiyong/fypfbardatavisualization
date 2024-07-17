@@ -8,6 +8,7 @@ import {
   getActiveCampaignCounts,
   getAuditInfoRealtime,
   getCouponUserCountsRedeemed,
+  getActiveUsersInPastTwoHours,
   AuditData,
 } from "@/app/firebase"; // Adjust the import path as needed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +16,9 @@ import DashboardGraph from "@/components/ui/DashboardGraph";
 import { OrgChart } from "@/components/ui/OrgChart";
 import CouponChart from "@/components/ui/CouponChart";
 import CampaignChart from "@/components/ui/CampaignGraph";
+import CouponRedemptionChart from "@/components/ui/CouponRedemptionGraph";
 import ActivityCard, { AuditProps } from "@/components/ui/ActivityCard";
+import CouponIssuanceChart from "@/components/ui/CouponIssuanceGraph";
 
 const HomeContent: React.FC = () => {
   const router = useRouter();
@@ -28,6 +31,8 @@ const HomeContent: React.FC = () => {
   const [auditData, setAuditData] = useState<AuditProps[]>([]);
   const [redeemedCoupons, setRedeemedCoupons] = useState<number | null>(null);
   const [redeemedCouponsPercentageDifference, setRedeemedCouponsPercentageDifference] = useState<number | null>(null);
+  const [activeUsersInPastHour, setActiveUsersInPastHour] = useState<number | null>(null);
+  const [activeUsersPercentageDifference, setActiveUsersPercentageDifference] = useState<number | null>(null);
 
   useEffect(() => {
     getTotalNotificationReceiversRealtime(
@@ -75,33 +80,44 @@ const HomeContent: React.FC = () => {
         setAuditData(mappedAudits);
       });
     };
+
     const fetchRedeemedCoupons = async () => {
       try {
         const couponCounts = await getCouponUserCountsRedeemed();
         const totalRedeemed = Object.values(couponCounts).reduce((acc, count) => acc + count, 0);
-    
+
         // Assuming you have the counts for last month to calculate percentage difference
         // For demonstration, let's assume last month's redeemed coupons count was 0
         const lastMonthRedeemed = 0; // This should be dynamically fetched or passed
-    
+
         let percentageDiff;
         if (lastMonthRedeemed === 0) {
           percentageDiff = totalRedeemed > 0 ? 100 : 0; // If last month was zero and this month is greater than zero, show 100% increase
         } else {
           percentageDiff = ((totalRedeemed - lastMonthRedeemed) / lastMonthRedeemed) * 100;
         }
-    
+
         setRedeemedCoupons(totalRedeemed);
         setRedeemedCouponsPercentageDifference(percentageDiff);
       } catch (error) {
         console.error("Error fetching redeemed coupons:", error);
       }
     };
-    
+
+    const fetchActiveUsersInPastTwoHours = async () => {
+      try {
+        const { currentHour, previousHour, percentageDifference } = await getActiveUsersInPastTwoHours();
+        setActiveUsersInPastHour(currentHour.length);
+        setActiveUsersPercentageDifference(percentageDifference);
+      } catch (error) {
+        console.error("Error fetching active users in past hour:", error);
+      }
+    };
 
     fetchActiveCampaignCounts();
     listenToAuditData();
     fetchRedeemedCoupons();
+    fetchActiveUsersInPastTwoHours();
   }, []);
 
   const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
@@ -153,9 +169,18 @@ const HomeContent: React.FC = () => {
       icon: CreditCard,
     },
     {
-      label: "Active Users Now",
-      amount: "+573",
-      description: "+201 since last hour",
+      label: "Active Users In Last Hour",
+      amount: activeUsersInPastHour !== null ? activeUsersInPastHour.toString() : "Loading...",
+      description: activeUsersPercentageDifference !== null ? (
+        <>
+          <span className={activeUsersPercentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
+            {activeUsersPercentageDifference.toFixed(1)}%
+          </span>{" "}
+          from prev hour
+        </>
+      ) : (
+        "Loading..."
+      ),
       icon: Users,
     },
   ];
@@ -179,20 +204,24 @@ const HomeContent: React.FC = () => {
           <section>
             <p className="font-semibold">Overview</p>
             <p className="text-sm text-gray-400 mb-0">
-              Some overview content here
+              Quick overview of the app metrics
             </p>
           </section>
 
           <Tabs defaultValue="campaigns" className="w-full">
-            <TabsList className="flex items-center justify-center flex-wrap h-auto space-y-1">
+            <TabsList className="flex items-center justify-center flex-wrap h-auto">
               <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-              <TabsTrigger value="issue">Issue</TabsTrigger>
+              <TabsTrigger value="issue">Issued</TabsTrigger>
               <TabsTrigger value="redemption">Redemption</TabsTrigger>
               <TabsTrigger value="coupons">Coupons</TabsTrigger>
               <TabsTrigger value="organization">Organization</TabsTrigger>
             </TabsList>
-            <TabsContent value="redemption"></TabsContent>
-            <TabsContent value="issue">Issue data here.</TabsContent>
+            <TabsContent value="redemption">
+              <CouponRedemptionChart />
+            </TabsContent>
+            <TabsContent value="issue">
+              <CouponIssuanceChart />
+            </TabsContent>
             <TabsContent value="campaigns">
               <CampaignChart />
             </TabsContent>

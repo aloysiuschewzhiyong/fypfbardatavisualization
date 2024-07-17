@@ -6,23 +6,23 @@ import {
   ChartTooltipContent,
   ChartLegendContent,
 } from '@/components/ui/chart';
-import { getActiveCampaignCounts } from '@/app/firebase';
+import { getMonthlyCouponIssuanceCount } from '@/app/firebase'; // Ensure this import matches your actual file structure
 
 interface Props {}
 
-const CampaignChart: React.FC<Props> = () => {
-  const [chartData, setChartData] = React.useState<{ month: string; campaigns: number }[]>([]);
+const CouponIssuanceChart: React.FC<Props> = () => {
+  const [chartData, setChartData] = React.useState<{ month: string; issued: number }[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const fetchChartData = async () => {
       try {
-        const data = await getActiveCampaignCounts();
+        const data = await getMonthlyCouponIssuanceCount();
         setChartData(data);
       } catch (error) {
-        console.error('Error fetching active campaign counts:', error);
-        setError('Failed to fetch active campaign counts');
+        console.error('Error fetching monthly coupon issuance counts:', error);
+        setError('Failed to fetch monthly coupon issuance counts');
       } finally {
         setLoading(false);
       }
@@ -30,6 +30,21 @@ const CampaignChart: React.FC<Props> = () => {
 
     fetchChartData();
   }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  const chartConfig: ChartConfig = {
+    issued: {
+      label: 'Coupons Issued',
+      color: 'currentColor',
+    },
+  };
 
   const roundUpToNearest10 = (num: number) => Math.ceil(num / 10) * 10;
 
@@ -41,18 +56,13 @@ const CampaignChart: React.FC<Props> = () => {
     return <div>{error}</div>;
   }
 
-  const maxCampaigns = roundUpToNearest10(Math.max(...chartData.map(data => data.campaigns)));
+  
+  const maxCampaigns = roundUpToNearest10(Math.max(...chartData.map(data => data.issued)));
 
-  const chartConfig: ChartConfig = {
-    campaigns: {
-      label: 'Campaigns active',
-      color: 'currentColor',
-    },
-  };
 
   return (
     <div className='p-2'>
-      <p className='font-medium text-sm bg-transparent'>Active Campaign by Month</p>
+      <p className='font-medium text-sm bg-transparent'>Coupon Issuance by Month</p>
       <ChartContainer config={chartConfig} className="h-[250px] w-full">
         <BarChart data={chartData} accessibilityLayer>
           <CartesianGrid vertical={false} />
@@ -60,8 +70,8 @@ const CampaignChart: React.FC<Props> = () => {
           <YAxis domain={[0, maxCampaigns]} />
           <Tooltip content={<ChartTooltipContent />} />
           <Legend content={<ChartLegendContent />} />
-          <Bar dataKey="campaigns" fill="currentColor" radius={[4, 4, 0, 0]} stackId="a" minPointSize={5}>
-            <LabelList dataKey="campaigns" position="top" />
+          <Bar dataKey="issued" fill="currentColor" radius={[4, 4, 0, 0]} stackId="a" minPointSize={5}>
+            <LabelList dataKey="issued" position="top" />
           </Bar>
         </BarChart>
       </ChartContainer>
@@ -69,4 +79,4 @@ const CampaignChart: React.FC<Props> = () => {
   );
 };
 
-export default CampaignChart;
+export default CouponIssuanceChart;

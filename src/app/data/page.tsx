@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import PageTitle from "@/components/ui/PageTitle";
 import Card, { CardContent } from "@/components/ui/CardBruh";
@@ -9,7 +8,7 @@ import {
   getProfilePictureURL,
   getTopLevelCollections,
   getCountOfDocumentsByField,
-} from "@/app/firebase"; // Adjust the import path as needed
+} from "@/app/firebase";
 import { User } from "firebase/auth";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
@@ -25,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import {
   ChartContainer,
-  ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
@@ -65,13 +63,11 @@ import {
 
 type Props = {};
 
-// Define the type for collection options
 interface CollectionOptions {
   dimensions: string[];
   metrics: string[];
 }
 
-// Explicitly define the collection options object
 const collectionOptions: { [key: string]: CollectionOptions } = {
   Campaigns: {
     dimensions: ["vendorID", "orgID", "campaignName"],
@@ -79,7 +75,7 @@ const collectionOptions: { [key: string]: CollectionOptions } = {
   },
   Coupons: {
     dimensions: ["couponName", "campaignID"],
-    metrics: ["Count of coupons"],
+    metrics: ["Count of coupons", "Issuance count", "Redemption count"]
   },
   Organizations: {
     dimensions: ["organizationName", "abbreviation"],
@@ -87,7 +83,7 @@ const collectionOptions: { [key: string]: CollectionOptions } = {
   },
   Users: {
     dimensions: ["username", "email", "role", "organization", "createdAt", "coupons"],
-    metrics: ["Count of users"],
+    metrics: ["Count of users" , "Issuance count", "Redemption count"],
   },
   Vendors: {
     dimensions: ["vendorName", "locationType", "postalCode"],
@@ -95,7 +91,6 @@ const collectionOptions: { [key: string]: CollectionOptions } = {
   },
 };
 
-// Mapping of user-friendly collection names to actual Firestore collection names
 const collectionNameMapping: { [key: string]: string } = {
   Campaigns: "campaign",
   Coupons: "couponFRFR",
@@ -104,7 +99,6 @@ const collectionNameMapping: { [key: string]: string } = {
   Vendors: "vendors",
 };
 
-// Utility function to generate a random color
 const getRandomColor = () => {
   const letters = "0123456789ABCDEF";
   let color = "#";
@@ -129,11 +123,11 @@ export default function DataPage({}: Props) {
   );
   const [metrics, setMetrics] = useState<string[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<string>("bar"); // State to manage the selected tab
+  const [selectedTab, setSelectedTab] = useState<string>("bar");
   const [colors, setColors] = useState<string[]>([]);
-  
+
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Adjust the number of items per page as needed
+  const itemsPerPage = 5;
 
   const [getBarPng, { ref: barChartRef }] = useCurrentPng();
   const [getPiePng, { ref: pieChartRef }] = useCurrentPng();
@@ -178,7 +172,6 @@ export default function DataPage({}: Props) {
           );
           console.log(`Data for ${selectedCollection}:`, data);
 
-          // Type assertion to ensure selectedCollection is a key of collectionOptions
           const selectedOptions = collectionOptions[
             selectedCollection as keyof typeof collectionOptions
           ] || {
@@ -289,7 +282,7 @@ export default function DataPage({}: Props) {
     } else if (selectedMetric === "Count of coupons") {
       return "No. of Coupons";
     } else if (selectedMetric === "Count of organizations") {
-      return "No. of User";
+      return "No. of Users";
     } else if (selectedMetric === "Count of users") {
       return "No. of Users";
     } else if (selectedMetric === "Count of vendors") {
@@ -325,7 +318,6 @@ export default function DataPage({}: Props) {
     }
   };
 
-  // Pagination logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = collectionData.slice(indexOfFirstItem, indexOfLastItem);
@@ -355,7 +347,7 @@ export default function DataPage({}: Props) {
         <PaginationContent>
           <PaginationPrevious
             onClick={handlePreviousPage}
-            className={currentPage === 1 ? 'invisible' : ''}
+            className={currentPage === 1 ? "invisible" : ""}
           >
             Previous
           </PaginationPrevious>
@@ -371,7 +363,7 @@ export default function DataPage({}: Props) {
           ))}
           <PaginationNext
             onClick={handleNextPage}
-            className={currentPage === totalPages ? 'invisible' : ''}
+            className={currentPage === totalPages ? "invisible" : ""}
           >
             Next
           </PaginationNext>
@@ -398,8 +390,8 @@ export default function DataPage({}: Props) {
               <Select
                 onValueChange={(value) => {
                   setSelectedCollection(value);
-                  setSelectedDimension(null); // Reset dimension when collection changes
-                  setSelectedMetric(null); // Reset metric when collection changes
+                  setSelectedDimension(null);
+                  setSelectedMetric(null);
                 }}
               >
                 <SelectTrigger className="w-[180px]">
@@ -425,7 +417,7 @@ export default function DataPage({}: Props) {
                 <Select
                   onValueChange={(value) => {
                     setSelectedDimension(value);
-                    setSelectedMetric(null); // Reset metric when dimension changes
+                    setSelectedMetric(null);
                   }}
                 >
                   <SelectTrigger className="w-[180px]">
@@ -479,11 +471,7 @@ export default function DataPage({}: Props) {
                 <TabsTrigger value="pie">Pie Chart</TabsTrigger>
               </TabsList>
 
-              <Button
-                variant={"outline"}
-                size={"icon"}
-                onClick={handleDownload}
-              >
+              <Button variant={"outline"} size={"icon"} onClick={handleDownload}>
                 <Download />
               </Button>
             </div>
@@ -496,7 +484,9 @@ export default function DataPage({}: Props) {
                   selectedDimension &&
                   selectedMetric && (
                     <>
-                      <h3 className="text-lg font-medium">Data for {selectedCollection}</h3>
+                      <h3 className="text-lg font-medium">
+                        Data for {selectedCollection}
+                      </h3>
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -533,7 +523,13 @@ export default function DataPage({}: Props) {
                           <BarChart data={collectionData} accessibilityLayer>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
-                            <YAxis label={{ value: getYAxisLabel(), angle: -90, position: 'insideLeft' }} />
+                            <YAxis
+                              label={{
+                                value: getYAxisLabel(),
+                                angle: -90,
+                                position: "insideLeft",
+                              }}
+                            />
                             <Tooltip content={<ChartTooltipContent />} />
                             <Legend />
                             <Bar

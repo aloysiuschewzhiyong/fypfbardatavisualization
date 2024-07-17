@@ -88,7 +88,7 @@ export function OrgChart() {
           data={filteredChartData}
           dataKey="value"
           nameKey="name"
-          innerRadius={45}
+          innerRadius={55}
           outerRadius={80}
           label
           labelLine={false}

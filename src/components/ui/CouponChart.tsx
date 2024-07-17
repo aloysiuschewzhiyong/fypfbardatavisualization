@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Pie, PieChart, Cell, Tooltip, Legend, Label } from "recharts"
-import { getCouponUserCounts } from "@/app/firebase"
+import { getCouponUserCounts, getCouponUserCountsRedeemed } from "@/app/firebase"
 import {
   ChartConfig,
   ChartContainer,
@@ -32,7 +32,7 @@ const CouponChart: React.FC = () => {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await getCouponUserCounts()
+        const data = await getCouponUserCountsRedeemed()
         const chartData = Object.keys(data).map((couponName, index) => ({
           name: couponName,
           value: data[couponName],
@@ -93,7 +93,7 @@ const CouponChart: React.FC = () => {
               data={filteredChartData}
               dataKey="value"
               nameKey="name"
-              innerRadius={45}
+              innerRadius={55}
               outerRadius={80}
               label
               labelLine={false}
@@ -124,7 +124,7 @@ const CouponChart: React.FC = () => {
                             y={(viewBox.cy || 0) + 24}
                             className="fill-muted-foreground"
                           >
-                            Users
+                            Redeemed
                           </tspan>
                         </text>
                       )

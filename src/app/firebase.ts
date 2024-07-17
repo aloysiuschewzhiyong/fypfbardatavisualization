@@ -1,10 +1,9 @@
 import { initializeApp } from 'firebase/app';
-import { getAnalytics } from 'firebase/analytics';
+// import { getAnalytics } from 'firebase/analytics';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, onSnapshot, Timestamp, doc, getDoc, DocumentData, QueryConstraint , orderBy} from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, onSnapshot, Timestamp, doc as firestoreDoc, getDoc, DocumentData, QueryConstraint, orderBy } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import * as admin from 'firebase-admin';
-
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,7 +16,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// const analytics = getAnalytics(app);
 const auth = getAuth();
 const db = getFirestore(app);
 const storage = getStorage(app);
@@ -66,7 +65,7 @@ export async function handleSignOut(): Promise<void> {
 
 export async function getUserData(uid: string): Promise<any> {
   try {
-    const userDoc = await getDoc(doc(db, 'users', uid));
+    const userDoc = await getDoc(firestoreDoc(db, 'users', uid));
     if (userDoc.exists()) {
       return userDoc.data();
     } else {
@@ -89,51 +88,6 @@ export const getProfilePictureURL = async (uid: string): Promise<string | null> 
     return null;
   }
 };
-
-export function getTotalNotificationReceiversRealtime(callback: (totalReceiversCurrentMonth: number, totalReceiversLastMonth: number, percentageDifference: number) => void): void {
-  const notificationsCollection = collection(db, 'notifications');
-
-  // Calculate the start date of the current month
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfMonthTimestamp = Timestamp.fromDate(startOfMonth);
-
-  // Calculate the start and end date of the last month
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-  const startOfLastMonthTimestamp = Timestamp.fromDate(startOfLastMonth);
-  const endOfLastMonthTimestamp = Timestamp.fromDate(endOfLastMonth);
-
-  onSnapshot(notificationsCollection, async (notificationsSnapshot) => {
-    let totalReceiversCurrentMonth = 0;
-    let totalReceiversLastMonth = 0;
-
-    const promises = notificationsSnapshot.docs.map(async (notificationDoc) => {
-      const notificationData = notificationDoc.data();
-      const notificationDateCreated = notificationData.dateCreated.toMillis();
-
-      if (notificationDateCreated >= startOfMonthTimestamp.toMillis()) {
-        const notifReceiversCollection = collection(db, `notifications/${notificationDoc.id}/notifReceivers`);
-        const notifReceiversSnapshot = await getDocs(notifReceiversCollection);
-        totalReceiversCurrentMonth += notifReceiversSnapshot.size;
-      }
-
-      if (notificationDateCreated >= startOfLastMonthTimestamp.toMillis() && notificationDateCreated <= endOfLastMonthTimestamp.toMillis()) {
-        const notifReceiversCollection = collection(db, `notifications/${notificationDoc.id}/notifReceivers`);
-        const notifReceiversSnapshot = await getDocs(notifReceiversCollection);
-        totalReceiversLastMonth += notifReceiversSnapshot.size;
-      }
-    });
-
-    await Promise.all(promises);
-
-    const percentageDifference = totalReceiversLastMonth > 0
-      ? ((totalReceiversCurrentMonth - totalReceiversLastMonth) / totalReceiversLastMonth) * 100
-      : 0;
-
-    callback(totalReceiversCurrentMonth, totalReceiversLastMonth, percentageDifference);
-  });
-}
 
 export async function getTopLevelCollections() {
   try {
@@ -163,7 +117,6 @@ export async function getDocumentsWithConditions(collectionName: string, conditi
     throw error;
   }
 }
-
 
 interface OrganizationUserCounts {
   [organizationName: string]: number;
@@ -204,7 +157,6 @@ export async function getCouponUserCounts(): Promise<{ [couponName: string]: num
     const usersRef = collection(db, 'users');
     const usersSnapshot = await getDocs(usersRef);
 
-    // Create a map to hold the user inventories
     const userInventories: { [userId: string]: string[] } = {};
 
     for (const userDoc of usersSnapshot.docs) {
@@ -213,15 +165,12 @@ export async function getCouponUserCounts(): Promise<{ [couponName: string]: num
       userInventories[userDoc.id] = userInventorySnapshot.docs.map(doc => doc.id);
     }
 
-    // Iterate through each coupon
     for (const couponDoc of couponsSnapshot.docs) {
       const couponData = couponDoc.data();
       const couponName = couponData.couponName;
 
-      // Initialize count for this coupon
       couponUserCounts[couponName] = 0;
 
-      // Iterate through each user's inventory to check if they have the current coupon
       for (const userId in userInventories) {
         if (userInventories[userId].includes(couponDoc.id)) {
           couponUserCounts[couponName]++;
@@ -247,7 +196,6 @@ export async function getCouponUserCountsRedeemed(): Promise<{ [couponName: stri
     const usersRef = collection(db, 'users');
     const usersSnapshot = await getDocs(usersRef);
 
-    // Create a map to hold the user inventories
     const userInventories: { [userId: string]: any[] } = {};
 
     for (const userDoc of usersSnapshot.docs) {
@@ -256,15 +204,12 @@ export async function getCouponUserCountsRedeemed(): Promise<{ [couponName: stri
       userInventories[userDoc.id] = userInventorySnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
     }
 
-    // Iterate through each coupon
     for (const couponDoc of couponsSnapshot.docs) {
       const couponData = couponDoc.data();
       const couponName = couponData.couponName;
 
-      // Initialize count for this coupon
       couponUserCounts[couponName] = 0;
 
-      // Iterate through each user's inventory to check if they have the current coupon
       for (const userId in userInventories) {
         const userInventory = userInventories[userId];
 
@@ -285,9 +230,6 @@ export async function getCouponUserCountsRedeemed(): Promise<{ [couponName: stri
   }
 }
 
-
-
-// Define the ChartData interface
 interface ChartData {
   month: string;
   campaigns: number;
@@ -310,20 +252,14 @@ export async function getActiveCampaignCounts(): Promise<ChartData[]> {
 
     campaignsSnapshot.forEach(campaignDoc => {
       const campaignData = campaignDoc.data() as DocumentData;
-      const validFrom = campaignData.validFrom.toDate(); // Assuming validFrom and validTo are Timestamps
+      const validFrom = campaignData.validFrom.toDate(); 
       const validTo = campaignData.validTo.toDate();
 
-      console.log(`Campaign valid from ${validFrom} to ${validTo}`);
-
-      // Iterate through each month of the current year
       for (let month = 0; month < 12; month++) {
         const startOfMonth = new Date(currentYear, month, 1);
-        const endOfMonth = new Date(currentYear, month + 1, 0, 23, 59, 59, 999); // Last moment of the month
+        const endOfMonth = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
 
-        // Check if the campaign is active in this month
-        if (
-          (validFrom <= endOfMonth) && (validTo >= startOfMonth)
-        ) {
+        if ((validFrom <= endOfMonth) && (validTo >= startOfMonth)) {
           const monthName = monthNames[month];
           if (!activeCampaignCounts[monthName]) {
             activeCampaignCounts[monthName] = 0;
@@ -344,11 +280,7 @@ export async function getActiveCampaignCounts(): Promise<ChartData[]> {
     console.error('Error fetching active campaign counts:', error);
     throw error;
   }
-
-  
 }
-
-
 
 export interface AuditData {
   id: string;
@@ -356,7 +288,7 @@ export interface AuditData {
   object: string;
   time: Date;
   user: string;
-  [key: string]: any; // Add index signature to allow additional properties
+  [key: string]: any;
 }
 
 export async function getAuditInfo(): Promise<AuditData[]> {
@@ -370,9 +302,9 @@ export async function getAuditInfo(): Promise<AuditData[]> {
         id: doc.id,
         action: data.action,
         object: data.object,
-        time: data.time.toDate(), // Convert Firestore Timestamp to JavaScript Date
+        time: data.time.toDate(),
         user: data.user,
-        ...data // Include any additional fields
+        ...data
       };
     });
 
@@ -384,12 +316,8 @@ export async function getAuditInfo(): Promise<AuditData[]> {
   }
 }
 
-
-
-
-
 export function getCampaignDetailsRealtime(campaignId: string, callback: (data: any) => void): void {
-  const campaignRef = doc(db, 'campaign', campaignId);
+  const campaignRef = firestoreDoc(db, 'campaign', campaignId);
 
   onSnapshot(campaignRef, (campaignDoc) => {
     if (campaignDoc.exists()) {
@@ -404,7 +332,7 @@ export function getCampaignDetailsRealtime(campaignId: string, callback: (data: 
 
 export function getAuditInfoRealtime(callback: (data: AuditData[]) => void): void {
   const auditRef = collection(db, 'audit');
-  const auditQuery = query(auditRef, orderBy('time', 'desc')); // Order by 'time' field in descending order
+  const auditQuery = query(auditRef, orderBy('time', 'desc'));
 
   onSnapshot(auditQuery, (snapshot) => {
     const audits: AuditData[] = snapshot.docs.map(doc => {
@@ -413,9 +341,9 @@ export function getAuditInfoRealtime(callback: (data: AuditData[]) => void): voi
         id: doc.id,
         action: data.action,
         object: data.object,
-        time: data.time.toDate(), // Convert Firestore Timestamp to JavaScript Date
+        time: data.time.toDate(),
         user: data.user,
-        ...data // Include any additional fields
+        ...data
       };
     });
 
@@ -424,31 +352,6 @@ export function getAuditInfoRealtime(callback: (data: AuditData[]) => void): voi
     console.error('Error fetching audit info:', error);
   });
 }
-
-
-// // Function to log all documents in a collection
-// async function logAllDocuments(collectionName: string) {
-//   const querySnapshot = await getDocs(collection(db, collectionName));
-//   querySnapshot.forEach((doc) => {
-//     console.log(`${collectionName} - Document ID: ${doc.id}`, doc.data());
-//   });
-// }
-
-// // List of collections to log
-// const collections: string[] = [
-//   'audit',
-//   'campaign',
-//   'couponFRFR',
-//   'editCoupon',
-//   'notifications',
-//   'organizations',
-//   'users',
-//   'vendors'
-// ];
-
-// // Log all documents for each collection
-// collections.forEach(collectionName => logAllDocuments(collectionName));
-
 
 export async function getCountOfDocumentsByField(
   collectionName: string,
@@ -465,21 +368,9 @@ export async function getCountOfDocumentsByField(
 
   for (const doc of snapshot.docs) {
     const data = doc.data();
+    const fieldValue = data[field];
 
-    if (field === 'coupons' && collectionName === 'users') {
-      const userInventoryRef = collection(db, `users/${doc.id}/inventory`);
-      const userInventorySnapshot = await getDocs(userInventoryRef);
-      
-      userInventorySnapshot.forEach(inventoryDoc => {
-        const couponId = inventoryDoc.id;
-        if (!fieldCounts[couponId]) {
-          fieldCounts[couponId] = 0;
-        }
-        fieldCounts[couponId]++;
-      });
-    } else {
-      const fieldValue = data[field];
-  
+    if (field) {
       if (isTimeField && duration) {
         const fieldDate = (data[field] as Timestamp).toDate();
         if (fieldDate >= duration.start && fieldDate <= duration.end) {
@@ -501,8 +392,8 @@ export async function getCountOfDocumentsByField(
               } else if (metric === "Average duration of campaigns") {
                 const validFrom = (data["validFrom"] as Timestamp).toDate();
                 const validTo = (data["validTo"] as Timestamp).toDate();
-                const duration = (validTo.getTime() - validFrom.getTime()) / (1000 * 60 * 60 * 24); // Duration in days
-  
+                const duration = (validTo.getTime() - validFrom.getTime()) / (1000 * 60 * 60 * 24);
+
                 if (!fieldDurations[fieldValue]) {
                   fieldDurations[fieldValue] = [];
                 }
@@ -515,16 +406,75 @@ export async function getCountOfDocumentsByField(
                   fieldCounts[fieldValue] = 0;
                 }
                 fieldCounts[fieldValue]++;
-              } else if (metric === "Count of coupons per organization") {
-                const organizationID = data["organizationID"];
-                if (organizationID) {
-                  if (!fieldCounts[organizationID]) {
-                    fieldCounts[organizationID] = 0;
-                  }
-                  fieldCounts[organizationID]++;
-                }
+              } else if (metric === "Issuance count") {
+                const notificationsRef = collection(db, 'notifications');
+                const notificationsSnapshot = await getDocs(notificationsRef);
+                await Promise.all(
+                  notificationsSnapshot.docs.map(async (notificationDoc) => {
+                    const notificationData = notificationDoc.data() as DocumentData;
+                    const couponId = notificationData.couponID;
+                    if (couponId === fieldValue) {
+                      const notifReceiversRef = collection(db, `notifications/${notificationDoc.id}/notifReceivers`);
+                      const notifReceiversSnapshot = await getDocs(notifReceiversRef);
+                      if (!fieldCounts[couponId]) {
+                        fieldCounts[couponId] = 0;
+                      }
+                      fieldCounts[couponId] += notifReceiversSnapshot.size;
+                    }
+                  })
+                );
               }
               break;
+            case "users":
+              switch (metric) {
+                case "Redemption count":
+                  const userInventoryRef = collection(db, `users/${doc.id}/inventory`);
+                  const userInventorySnapshot = await getDocs(userInventoryRef);
+
+                  userInventorySnapshot.forEach(inventoryDoc => {
+                    const inventoryData = inventoryDoc.data();
+                    if (inventoryData.redeemed) {
+                      if (!fieldCounts[fieldValue]) {
+                        fieldCounts[fieldValue] = 0;
+                      }
+                      fieldCounts[fieldValue]++;
+                    }
+                  });
+                  break;
+
+                case "Count of users":
+                  if (!fieldCounts[fieldValue]) {
+                    fieldCounts[fieldValue] = 0;
+                  }
+                  fieldCounts[fieldValue]++;
+                  break;
+
+                case "Issuance count":
+                  const notificationsRef = collection(db, 'notifications');
+                  const notificationsSnapshot = await getDocs(notificationsRef);
+
+                  for (const notificationDoc of notificationsSnapshot.docs) {
+                    const notificationData = notificationDoc.data() as DocumentData;
+                    const couponId = notificationData.couponID;
+
+                    if (couponId) {
+                      const notifReceiversRef = collection(db, `notifications/${notificationDoc.id}/notifReceivers`);
+                      const notifReceiversSnapshot = await getDocs(notifReceiversRef);
+
+                      if (!fieldCounts[couponId]) {
+                        fieldCounts[couponId] = 0;
+                      }
+
+                      fieldCounts[couponId] += notifReceiversSnapshot.size;
+                    }
+                  }
+                  break;
+
+                default:
+                  break;
+              }
+              break;
+
             case "organizations":
               if (metric === "Count of organizations") {
                 if (!fieldCounts[fieldValue]) {
@@ -533,14 +483,7 @@ export async function getCountOfDocumentsByField(
                 fieldCounts[fieldValue]++;
               }
               break;
-            case "users":
-              if (metric === "Count of users") {
-                if (!fieldCounts[fieldValue]) {
-                  fieldCounts[fieldValue] = 0;
-                }
-                fieldCounts[fieldValue]++;
-              }
-              break;
+
             case "vendors":
               if (metric === "Count of vendors") {
                 if (!fieldCounts[fieldValue]) {
@@ -549,6 +492,7 @@ export async function getCountOfDocumentsByField(
                 fieldCounts[fieldValue]++;
               }
               break;
+
             default:
               break;
           }
@@ -561,29 +505,245 @@ export async function getCountOfDocumentsByField(
     Object.keys(fieldDurations).forEach(key => {
       const durations = fieldDurations[key];
       const averageDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
-      fieldCounts[key] = parseFloat(averageDuration.toFixed(2)); // Format to 2 decimal places
+      fieldCounts[key] = parseFloat(averageDuration.toFixed(2));
     });
   }
 
   return fieldCounts;
 }
 
+interface ChartDataCoupons {
+  month: string;
+  redemptions: number;
+}
 
-// // Usage Example
-// getCountOfDocumentsByField(db, 'campaigns', 'vendorID').then(fieldCounts => {
-//   console.log('Count by vendorID:', fieldCounts);
-// }).catch(error => {
-//   console.error('Error fetching campaigns:', error);
-// });
+export async function getMonthlyRedemptionCount(): Promise<ChartDataCoupons[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
 
+    const now = new Date();
+    const currentYear = now.getFullYear();
 
-// async function testGetCountOfDocumentsByField() {
-//   try {
-//     const result = await getCountOfDocumentsByField('campaign', 'vendorID', 'Count of campaigns');
-//     console.log('Test Result:', result);
-//   } catch (error) {
-//     console.error('Error in testGetCountOfDocumentsByField:', error);
-//   }
-// }
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
 
-// testGetCountOfDocumentsByField();
+    const monthlyRedemptionCounts: { [month: string]: number } = {};
+
+    for (const userDoc of usersSnapshot.docs) {
+      const inventoryRef = collection(db, `users/${userDoc.id}/inventory`);
+      const inventorySnapshot = await getDocs(inventoryRef);
+
+      inventorySnapshot.forEach(inventoryDoc => {
+        const inventoryData = inventoryDoc.data() as DocumentData;
+
+        if (inventoryData.redeemed) {
+          const redeemedDate = inventoryData.redeemed.toDate();
+
+          if (redeemedDate.getFullYear() === currentYear) {
+            const monthName = monthNames[redeemedDate.getMonth()];
+            if (!monthlyRedemptionCounts[monthName]) {
+              monthlyRedemptionCounts[monthName] = 0;
+            }
+            monthlyRedemptionCounts[monthName]++;
+          }
+        }
+      });
+    }
+
+    const redemptionData: ChartDataCoupons[] = monthNames.map(month => ({
+      month,
+      redemptions: monthlyRedemptionCounts[month] || 0
+    }));
+
+    console.log('Monthly redemption counts:', redemptionData);
+    return redemptionData;
+  } catch (error) {
+    console.error('Error fetching monthly redemption counts:', error);
+    throw error;
+  }
+}
+
+interface ChartDataCouponsIssued {
+  month: string;
+  issued: number;
+}
+
+export async function getMonthlyCouponIssuanceCount(): Promise<ChartDataCouponsIssued[]> {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const notificationsSnapshot = await getDocs(notificationsRef);
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+
+    const monthlyIssuanceCounts: { [month: string]: number } = {};
+
+    for (const notificationDoc of notificationsSnapshot.docs) {
+      const notificationData = notificationDoc.data() as DocumentData;
+      const dateCreated = notificationData.dateCreated.toDate();
+
+      if (dateCreated.getFullYear() === currentYear) {
+        const monthName = monthNames[dateCreated.getMonth()];
+        if (!monthlyIssuanceCounts[monthName]) {
+          monthlyIssuanceCounts[monthName] = 0;
+        }
+
+        const notifReceiversRef = collection(db, `notifications/${notificationDoc.id}/notifReceivers`);
+        const notifReceiversSnapshot = await getDocs(notifReceiversRef);
+        monthlyIssuanceCounts[monthName] += notifReceiversSnapshot.size;
+      }
+    }
+
+    const issuanceData: ChartDataCouponsIssued[] = monthNames.map(month => ({
+      month,
+      issued: monthlyIssuanceCounts[month] || 0
+    }));
+
+    console.log('Monthly coupon issuance counts:', issuanceData);
+    return issuanceData;
+  } catch (error) {
+    console.error('Error fetching monthly coupon issuance counts:', error);
+    throw error;
+  }
+}
+
+export interface UserData {
+  id: string;
+  email: string;
+  organization: string;
+  role: string;
+  username: string;
+  createdAt: Date;
+  [key: string]: any;
+}
+
+export async function getAllUsers(): Promise<UserData[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+
+    const usersData: UserData[] = usersSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        email: data.email,
+        organization: data.organization,
+        role: data.role,
+        username: data.username,
+        createdAt: data.createdAt.toDate(),
+        ...data
+      };
+    });
+
+    console.log('All users data:', usersData);
+    return usersData;
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    throw error;
+  }
+}
+
+export function getTotalNotificationReceiversRealtime(callback: (totalReceiversCurrentMonth: number, totalReceiversLastMonth: number, percentageDifference: number) => void): void {
+  const notificationsCollection = collection(db, 'notifications');
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfMonthTimestamp = Timestamp.fromDate(startOfMonth);
+
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  const startOfLastMonthTimestamp = Timestamp.fromDate(startOfLastMonth);
+  const endOfLastMonthTimestamp = Timestamp.fromDate(endOfLastMonth);
+
+  onSnapshot(notificationsCollection, async (notificationsSnapshot) => {
+    let totalReceiversCurrentMonth = 0;
+    let totalReceiversLastMonth = 0;
+
+    const promises = notificationsSnapshot.docs.map(async (notificationDoc) => {
+      const notificationData = notificationDoc.data();
+      const notificationDateCreated = notificationData.dateCreated.toMillis();
+
+      if (notificationDateCreated >= startOfMonthTimestamp.toMillis()) {
+        const notifReceiversCollection = collection(db, `notifications/${notificationDoc.id}/notifReceivers`);
+        const notifReceiversSnapshot = await getDocs(notifReceiversCollection);
+        totalReceiversCurrentMonth += notifReceiversSnapshot.size;
+      }
+
+      if (notificationDateCreated >= startOfLastMonthTimestamp.toMillis() && notificationDateCreated <= endOfLastMonthTimestamp.toMillis()) {
+        const notifReceiversCollection = collection(db, `notifications/${notificationDoc.id}/notifReceivers`);
+        const notifReceiversSnapshot = await getDocs(notifReceiversCollection);
+        totalReceiversLastMonth += notifReceiversSnapshot.size;
+      }
+    });
+
+    await Promise.all(promises);
+
+    const percentageDifference = totalReceiversLastMonth > 0
+      ? ((totalReceiversCurrentMonth - totalReceiversLastMonth) / totalReceiversLastMonth) * 100
+      : 0;
+
+    callback(totalReceiversCurrentMonth, totalReceiversLastMonth, percentageDifference);
+  });
+}
+
+interface ActiveUsersData {
+  currentHour: string[];
+  previousHour: string[];
+  percentageDifference: number;
+}
+
+export async function getActiveUsersInPastTwoHours(): Promise<ActiveUsersData> {
+  try {
+    const allActivitySnapshot = await getDocs(collection(db, 'analytics'));
+
+    const now = new Date();
+    const oneHourAgo = Timestamp.fromDate(new Date(now.getTime() - 60 * 60 * 1000));
+    const twoHoursAgo = Timestamp.fromDate(new Date(now.getTime() - 2 * 60 * 60 * 1000));
+
+    const currentHourActiveUserIds: Set<string> = new Set();
+    const previousHourActiveUserIds: Set<string> = new Set();
+
+    allActivitySnapshot.forEach(doc => {
+      const data = doc.data();
+      const lastActive = data.last_active?.toDate();
+      if (lastActive) {
+        if (lastActive > oneHourAgo.toDate() && data.userId) {
+          currentHourActiveUserIds.add(data.userId);
+        } else if (lastActive > twoHoursAgo.toDate() && lastActive <= oneHourAgo.toDate() && data.userId) {
+          previousHourActiveUserIds.add(data.userId);
+        }
+      }
+    });
+
+    const currentHourActiveUsersArray = Array.from(currentHourActiveUserIds);
+    const previousHourActiveUsersArray = Array.from(previousHourActiveUserIds);
+
+    const currentHourCount = currentHourActiveUsersArray.length;
+    const previousHourCount = previousHourActiveUsersArray.length;
+
+    const percentageDifference = previousHourCount === 0 ? 
+      (currentHourCount > 0 ? 100 : 0) : 
+      ((currentHourCount - previousHourCount) / previousHourCount) * 100;
+
+    console.log("Active users in the past hour:", currentHourActiveUsersArray);
+    console.log("Active users in the previous hour:", previousHourActiveUsersArray);
+    console.log("Percentage difference:", percentageDifference);
+
+    return {
+      currentHour: currentHourActiveUsersArray,
+      previousHour: previousHourActiveUsersArray,
+      percentageDifference,
+    };
+  } catch (error) {
+    console.error("Error retrieving active users:", error);
+    throw error;
+  }
+}
