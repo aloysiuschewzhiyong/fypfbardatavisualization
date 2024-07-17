@@ -81,7 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={cn("min-h-screen w-full flex", inter.className, { "debug-screens": process.env.NODE_ENV === "development" })}>
         {isAuthPage ? (
-          <div className="w-full py-10 px-12">{children}</div>
+          <div className="w-full">{children}</div>
         ) : (
           <ThemeProvider attribute="class">
             {!isAuthPage && <SideNavbar />}
