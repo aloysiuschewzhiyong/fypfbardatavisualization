@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 // import { getAnalytics } from 'firebase/analytics';
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, onSnapshot, Timestamp, doc as firestoreDoc, getDoc, DocumentData, QueryConstraint, orderBy } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, User, signOut , updateEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword , sendEmailVerification } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, onSnapshot, Timestamp, updateDoc, doc as firestoreDoc, getDoc, DocumentData, QueryConstraint, orderBy } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import * as admin from 'firebase-admin';
 
@@ -20,6 +20,82 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+
+export async function handleUsernameChange(currentUserId: string, newUsername: string): Promise<void> {
+  try {
+    const userDocRef = firestoreDoc(db, 'users', currentUserId);
+    await updateDoc(userDocRef, { username: newUsername });
+    console.log('Username updated successfully');
+  } catch (error) {
+    console.error('Error updating username:', error);
+    throw error;
+  }
+}
+
+export async function handleEmailChange(currentUser: User, newEmail: string, currentPassword: string): Promise<void> {
+
+  try {
+    // Reauthenticate the user
+    const credential = EmailAuthProvider.credential(currentUser.email!, currentPassword);
+    await reauthenticateWithCredential(currentUser, credential);
+
+    // Send verification email to new email address
+    await updateEmail(currentUser, newEmail);
+    await sendEmailVerification(currentUser);
+    console.log('Verification email sent successfully');
+
+    // Poll or wait for user action to verify the new email
+    let isVerified = false;
+    while (!isVerified) {
+      // Reload the user profile to get the latest email verification status
+      await currentUser.reload();
+      isVerified = currentUser.emailVerified;
+
+      if (!isVerified) {
+        // Wait for some time before checking again (e.g., 5 seconds)
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+
+    console.log('New email has been verified');
+
+    // Update email in Firestore
+    const userDocRef = firestoreDoc(db, 'users', currentUser.uid);
+    await updateDoc(userDocRef, { email: newEmail });
+    console.log('Email updated successfully in Firestore');
+  } catch (error) {
+    console.error('Error updating email:', error);
+
+    if ((error as any).code === 'auth/email-already-in-use') {
+      console.error('The email address is already in use by another account.');
+    } else if ((error as any).code === 'auth/invalid-email') {
+      console.error('The email address is not valid.');
+    } else if ((error as any).code === 'auth/requires-recent-login') {
+      console.error('The user must reauthenticate before this operation can be executed.');
+    } else {
+      console.error('An unknown error occurred:', (error as Error).message);
+    }
+
+    throw error;
+  }
+}
+
+
+export async function handlePasswordChange(currentUser: User, currentPassword: string, newPassword: string): Promise<void> {
+  try {
+    // Re-authenticate the user
+    const credential = EmailAuthProvider.credential(currentUser.email!, currentPassword);
+    await reauthenticateWithCredential(currentUser, credential);
+
+    // Update password in Firebase Authentication
+    await updatePassword(currentUser, newPassword);
+    console.log('Password updated successfully in Firebase Authentication');
+  } catch (error) {
+    console.error('Error updating password:', error);
+    throw error;
+  }
+}
 
 export async function handleSignIn(email: string, password: string): Promise<void> {
   try {
@@ -747,3 +823,17 @@ export async function getActiveUsersInPastTwoHours(): Promise<ActiveUsersData> {
     throw error;
   }
 }
+
+export {
+  auth,
+  db,
+  storage,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+  updateEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  sendEmailVerification
+};

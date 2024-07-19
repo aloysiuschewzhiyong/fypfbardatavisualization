@@ -19,6 +19,7 @@ import CampaignChart from "@/components/ui/CampaignGraph";
 import CouponRedemptionChart from "@/components/ui/CouponRedemptionGraph";
 import ActivityCard, { AuditProps } from "@/components/ui/ActivityCard";
 import CouponIssuanceChart from "@/components/ui/CouponIssuanceGraph";
+import PageTitle from "@/components/ui/PageTitle";
 
 const HomeContent: React.FC = () => {
   const router = useRouter();
@@ -187,6 +188,7 @@ const HomeContent: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5 w-full">
+      <PageTitle title="Dashboard" />
       <section className="grid w-full grid-cols-1 gap-4 gap-x-4 transition-all sm:grid-cols-2 xl:grid-cols-4">
         {cardData.map((d, i) => (
           <Card

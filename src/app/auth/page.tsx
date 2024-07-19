@@ -92,7 +92,7 @@ export default function AuthenticationPage() {
                             <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 512 373.67"
-            className="w-1/2 h-auto items-center"
+            className="w-1/2 h-auto items-center "
           >
             <defs>
               <style>
@@ -102,7 +102,7 @@ export default function AuthenticationPage() {
                     
                   }
                   .cls-3, .cls-4 {
-                    fill: #000;
+                     fill:hsl(var(--primary));
                     fill-opacity:1;
                     stroke-miterlimit: 10;
                   }`}

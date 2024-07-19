@@ -85,7 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ) : (
           <ThemeProvider attribute="class">
             {!isAuthPage && <SideNavbar />}
-            <div className="w-full py-10 px-12">{children}</div>
+            <div className="w-full p-4 py-6 sm:p-4 md:p-6 lg:p-10 xl:p-12">{children}</div>
             <Toaster />
           </ThemeProvider>
         )}
