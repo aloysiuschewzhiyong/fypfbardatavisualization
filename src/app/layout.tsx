@@ -1,29 +1,33 @@
-"use client";
-
+"use client"
+import React, { ReactNode } from 'react';
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import SideNavbar from "@/components/SideNavbar";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useCallback, useState, useRef } from "react";
-import { checkAuthState, getAuditInfoRealtime, AuditData } from "@/app/firebase"; // Adjust the import path as needed
-import { metadata } from "./metadata"; // Import metadata from the new file
+import { checkAuthState, getAuditInfoRealtime, AuditData } from "@/app/firebase";
+import { metadata } from "./metadata";
 import { ThemeProvider } from "@/components/ui/theme-provider";
-import { toast, Toaster } from 'sonner'; // Import toast and Toaster from sonner
-import { X } from 'lucide-react'; // Import an icon from lucide-react
+import { toast, Toaster } from 'sonner';
+import { X } from 'lucide-react';
+import { AuditAlertProvider, useAuditAlert } from "@/components/ui/AuditContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+interface RootLayoutProps {
+  children: ReactNode;
+}
+
+const RootLayout = ({ children }: RootLayoutProps) => {
   const pathname = usePathname();
   const router = useRouter();
   const isAuthPage = pathname.startsWith("/auth");
 
-  // State to track the latest audit log
+  const { auditEnabled } = useAuditAlert();
   const [latestAuditTime, setLatestAuditTime] = useState<number | null>(null);
   const listenerAddedRef = useRef(false);
 
-  // Helper function to ensure title and description are strings
   const getString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
   const title: string = getString(metadata.title);
@@ -33,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     toast(
       `Audit log updated: ${audit.action} ${audit.object}`,
       {
-        duration: 2000, // Set the duration in milliseconds
+        duration: 3000,
         action: {
           label: <X size={12} />,
           onClick: () => toast.dismiss(),
@@ -51,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       }
     });
 
-    if (!listenerAddedRef.current) {
+    if (!listenerAddedRef.current && auditEnabled) {
       listenerAddedRef.current = true;
 
       getAuditInfoRealtime((audits: AuditData[]) => {
@@ -71,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         unsubscribeAuth();
       }
     };
-  }, [router, isAuthPage, showAuditUpdateToast, latestAuditTime]);
+  }, [router, isAuthPage, showAuditUpdateToast, latestAuditTime, auditEnabled]);
 
   return (
     <html lang="en">
@@ -92,4 +96,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </body>
     </html>
   );
-}
+};
+
+const WrappedRootLayout = ({ children }: RootLayoutProps) => (
+  <AuditAlertProvider>
+    <RootLayout>{children}</RootLayout>
+  </AuditAlertProvider>
+);
+
+export default WrappedRootLayout;

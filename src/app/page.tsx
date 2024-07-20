@@ -41,6 +41,7 @@ const HomeContent: React.FC = () => {
         setTotalReceiversCurrentMonth(totalCurrent);
         setTotalReceiversLastMonth(totalLast);
         setPercentageDifference(percentageDiff);
+        console.log('Total Last:', totalLast); // Log the total receivers data
       }
     );
 
@@ -51,6 +52,8 @@ const HomeContent: React.FC = () => {
         const currentMonthName = now.toLocaleString('default', { month: 'short' });
         const lastMonthName = new Date(now.setMonth(now.getMonth() - 1)).toLocaleString('default', { month: 'short' });
 
+        console.log('Campaign Counts:', campaignCounts); // Log the campaign counts data
+
         const currentMonthCampaign = campaignCounts.find(
           (campaign) => campaign.month === currentMonthName
         );
@@ -60,7 +63,10 @@ const HomeContent: React.FC = () => {
 
         const currentCampaigns = currentMonthCampaign ? currentMonthCampaign.campaigns : 0;
         const lastCampaigns = lastMonthCampaign ? lastMonthCampaign.campaigns : 0;
-        const percentageDiff = lastCampaigns ? ((currentCampaigns - lastCampaigns) / lastCampaigns * 100) : 0;
+        const percentageDiff = lastCampaigns ? ((currentCampaigns - lastCampaigns) / lastCampaigns * 100) : currentCampaigns * 100;
+
+        console.log('Current Month:', currentMonthName, 'Current Campaigns:', currentCampaigns); // Log current month campaigns
+        console.log('Last Month:', lastMonthName, 'Last Campaigns:', lastCampaigns); // Log last month campaigns
 
         setActiveCampaignsCurrentMonth(currentCampaigns);
         setActiveCampaignsLastMonth(lastCampaigns);
@@ -93,10 +99,13 @@ const HomeContent: React.FC = () => {
 
         let percentageDiff;
         if (lastMonthRedeemed === 0) {
-          percentageDiff = totalRedeemed > 0 ? 100 : 0; // If last month was zero and this month is greater than zero, show 100% increase
+          percentageDiff = totalRedeemed > 0 ? totalRedeemed * 100 : 0; // If last month was zero and this month is greater than zero, show 100% increase
         } else {
           percentageDiff = ((totalRedeemed - lastMonthRedeemed) / lastMonthRedeemed) * 100;
         }
+
+        console.log('Total Redeemed Coupons:', totalRedeemed); // Log total redeemed coupons
+        console.log('Percentage Difference in Redeemed Coupons:', percentageDiff); // Log percentage difference
 
         setRedeemedCoupons(totalRedeemed);
         setRedeemedCouponsPercentageDifference(percentageDiff);
@@ -123,6 +132,12 @@ const HomeContent: React.FC = () => {
 
   const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
 
+  const formatPercentage = (percentage: number) => {
+    if (percentage === null) return "Loading...";
+    if (percentage === 0) return "+0.0%";
+    return percentage > 0 ? `+${percentage.toFixed(1)}%` : `${percentage.toFixed(1)}%`;
+  };
+
   const cardData: CardProps[] = [
     {
       label: `Coupons Issued in ${currentMonthName}`,
@@ -130,7 +145,7 @@ const HomeContent: React.FC = () => {
       description: percentageDifference !== null ? (
         <>
           <span className={percentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
-            {percentageDifference.toFixed(1)}%
+            {formatPercentage(percentageDifference)}
           </span>{" "}
           from last month
         </>
@@ -145,7 +160,7 @@ const HomeContent: React.FC = () => {
       description: redeemedCouponsPercentageDifference !== null ? (
         <>
           <span className={redeemedCouponsPercentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
-            {redeemedCouponsPercentageDifference.toFixed(1)}%
+            {formatPercentage(redeemedCouponsPercentageDifference)}
           </span>{" "}
           from last month
         </>
@@ -160,7 +175,7 @@ const HomeContent: React.FC = () => {
       description: activeCampaignsPercentageDifference !== null ? (
         <>
           <span className={activeCampaignsPercentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
-            {activeCampaignsPercentageDifference.toFixed(1)}%
+            {formatPercentage(activeCampaignsPercentageDifference)}
           </span>{" "}
           from last month
         </>
@@ -175,7 +190,7 @@ const HomeContent: React.FC = () => {
       description: activeUsersPercentageDifference !== null ? (
         <>
           <span className={activeUsersPercentageDifference >= 0 ? "text-green-500 font-medium" : "text-red-500 font-medium"}>
-            {activeUsersPercentageDifference.toFixed(1)}%
+            {formatPercentage(activeUsersPercentageDifference)}
           </span>{" "}
           from prev hour
         </>

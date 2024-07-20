@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import PageTitle from "@/components/ui/PageTitle";
 import Card, { CardContent } from "@/components/ui/CardBruh";
 import {
@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { useCurrentPng } from "recharts-to-png";
+import { useGenerateImage } from "recharts-to-png";
 import FileSaver from "file-saver";
 import {
   Pagination,
@@ -68,6 +68,11 @@ interface CollectionOptions {
   metrics: string[];
 }
 
+interface Item {
+  name: string;
+  value: number;
+}
+
 const collectionOptions: { [key: string]: CollectionOptions } = {
   Campaigns: {
     dimensions: ["vendorID", "orgID", "campaignName"],
@@ -75,18 +80,14 @@ const collectionOptions: { [key: string]: CollectionOptions } = {
   },
   Coupons: {
     dimensions: ["couponName", "campaignID"],
-    metrics: ["Count of coupons", "Issuance count", "Redemption count"]
-  },
-  Organizations: {
-    dimensions: ["organizationName", "abbreviation"],
-    metrics: ["Count of organizations"],
+    metrics: ["Count of coupons", "Issuance count", "Redemption count"],
   },
   Users: {
-    dimensions: ["username", "email", "role", "organization", "createdAt", "coupons"],
-    metrics: ["Count of users" , "Issuance count", "Redemption count"],
+    dimensions: ["username", "email", "role", "organization"],
+    metrics: ["Count of users", "Issuance count", "Redemption count"],
   },
   Vendors: {
-    dimensions: ["vendorName", "locationType", "postalCode"],
+    dimensions: ["vendorName", "locationType"],
     metrics: ["Count of vendors"],
   },
 };
@@ -113,24 +114,29 @@ export default function DataPage({}: Props) {
   const [userData, setUserData] = useState<any | null>(null);
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
   const [collections, setCollections] = useState<string[]>([]);
-  const [selectedCollection, setSelectedCollection] = useState<string | null>(
-    null
-  );
-  const [collectionData, setCollectionData] = useState<any[]>([]);
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
+  const [collectionData, setCollectionData] = useState<Item[]>([]);
   const [dimensions, setDimensions] = useState<string[]>([]);
-  const [selectedDimension, setSelectedDimension] = useState<string | null>(
-    null
-  );
+  const [selectedDimension, setSelectedDimension] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<string[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<string>("bar");
   const [colors, setColors] = useState<string[]>([]);
+  const [barFillColor, setBarFillColor] = useState<string>("currentColor");
+  const [sortOrder, setSortOrder] = useState<string>("none");
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const [getBarPng, { ref: barChartRef }] = useCurrentPng();
-  const [getPiePng, { ref: pieChartRef }] = useCurrentPng();
+  const [getBarPng, { ref: barChartRef }] = useGenerateImage<HTMLDivElement>({
+    quality: 1,
+    type: 'image/png',
+  });
+
+  const [getPiePng, { ref: pieChartRef }] = useGenerateImage<HTMLDivElement>({
+    quality: 1,
+    type: 'image/png',
+  });
 
   useEffect(() => {
     checkAuthState(async (user) => {
@@ -157,103 +163,41 @@ export default function DataPage({}: Props) {
   }, []);
 
   useEffect(() => {
-    const fetchCollectionData = async () => {
-      if (selectedCollection) {
-        try {
-          const actualCollectionName =
-            collectionNameMapping[selectedCollection];
-          const data = await getCountOfDocumentsByField(
-            actualCollectionName,
-            "vendorID",
-            "Count of campaigns"
-          );
-          setCollectionData(
-            Object.entries(data).map(([key, value]) => ({ name: key, value }))
-          );
-          console.log(`Data for ${selectedCollection}:`, data);
-
-          const selectedOptions = collectionOptions[
-            selectedCollection as keyof typeof collectionOptions
-          ] || {
-            dimensions: [],
-            metrics: [],
-          };
-
-          setDimensions(selectedOptions.dimensions);
-          setMetrics(selectedOptions.metrics);
-          setColors(Object.keys(data).map(() => getRandomColor()));
-        } catch (error) {
-          console.error(
-            `Error fetching data for collection ${selectedCollection}:`,
-            error
-          );
-        }
-      }
-    };
-
-    fetchCollectionData();
+    if (selectedCollection) {
+      const selectedOptions = collectionOptions[selectedCollection] || {
+        dimensions: [],
+        metrics: [],
+      };
+      setDimensions(selectedOptions.dimensions);
+      setMetrics(selectedOptions.metrics);
+      setSelectedDimension(null);
+      setSelectedMetric(null);
+    }
   }, [selectedCollection]);
 
-  useEffect(() => {
-    const fetchDimensionData = async () => {
-      if (selectedCollection && selectedDimension) {
-        try {
-          const actualCollectionName =
-            collectionNameMapping[selectedCollection];
-          const data = await getCountOfDocumentsByField(
-            actualCollectionName,
-            selectedDimension,
-            "Count of campaigns"
-          );
-          setCollectionData(
-            Object.entries(data).map(([key, value]) => ({ name: key, value }))
-          );
-          console.log(
-            `Data for ${selectedCollection} with dimension ${selectedDimension}:`,
-            data
-          );
-          setColors(Object.keys(data).map(() => getRandomColor()));
-        } catch (error) {
-          console.error(
-            `Error fetching data for collection ${selectedCollection} with dimension ${selectedDimension}:`,
-            error
-          );
-        }
-      }
-    };
-
-    fetchDimensionData();
-  }, [selectedCollection, selectedDimension]);
+  const fetchCollectionData = async (collection: string, dimension: string, metric: string) => {
+    try {
+      console.log("Fetching data for:", { collection, dimension, metric });
+      const actualCollectionName = collectionNameMapping[collection];
+      const data = await getCountOfDocumentsByField(
+        actualCollectionName,
+        dimension,
+        metric
+      );
+      setCollectionData(
+        Object.entries(data).map(([key, value]) => ({ name: key, value }))
+      );
+      console.log(`Data for ${collection} with dimension ${dimension} and metric ${metric}:`, data);
+      setColors(Object.keys(data).map(() => getRandomColor()));
+    } catch (error) {
+      console.error(`Error fetching data for collection ${collection} with dimension ${dimension} and metric ${metric}:`, error);
+    }
+  };
 
   useEffect(() => {
-    const fetchMetricData = async () => {
-      if (selectedCollection && selectedDimension && selectedMetric) {
-        try {
-          const actualCollectionName =
-            collectionNameMapping[selectedCollection];
-          const data = await getCountOfDocumentsByField(
-            actualCollectionName,
-            selectedDimension,
-            selectedMetric
-          );
-          setCollectionData(
-            Object.entries(data).map(([key, value]) => ({ name: key, value }))
-          );
-          console.log(
-            `Data for ${selectedCollection} with dimension ${selectedDimension} and metric ${selectedMetric}:`,
-            data
-          );
-          setColors(Object.keys(data).map(() => getRandomColor()));
-        } catch (error) {
-          console.error(
-            `Error fetching data for collection ${selectedCollection} with dimension ${selectedDimension} and metric ${selectedMetric}:`,
-            error
-          );
-        }
-      }
-    };
-
-    fetchMetricData();
+    if (selectedCollection && selectedDimension && selectedMetric) {
+      fetchCollectionData(selectedCollection, selectedDimension, selectedMetric);
+    }
   }, [selectedCollection, selectedDimension, selectedMetric]);
 
   const getYAxisLabel = () => {
@@ -263,6 +207,10 @@ export default function DataPage({}: Props) {
       return "Average Duration (days)";
     } else if (selectedMetric === "Count of coupons") {
       return "Number of Coupons";
+    } else if (selectedMetric === "Issuance count") {
+      return "Number of Issuances";
+    } else if (selectedMetric === "Redemption count") {
+      return "Number of Redemptions";
     } else if (selectedMetric === "Count of organizations") {
       return "Number of Users in Organization";
     } else if (selectedMetric === "Count of users") {
@@ -281,6 +229,10 @@ export default function DataPage({}: Props) {
       return "Average Duration (days)";
     } else if (selectedMetric === "Count of coupons") {
       return "No. of Coupons";
+    } else if (selectedMetric === "Issuance count") {
+      return "No. of Issuances";
+    } else if (selectedMetric === "Redemption count") {
+      return "No. of Redemptions";
     } else if (selectedMetric === "Count of organizations") {
       return "No. of Users";
     } else if (selectedMetric === "Count of users") {
@@ -292,26 +244,51 @@ export default function DataPage({}: Props) {
     }
   };
 
+  const sortData = useCallback((data: Item[], order: string) => {
+    if (order === "ascending") {
+      return [...data].sort((a, b) => a.value - b.value);
+    } else if (order === "descending") {
+      return [...data].sort((a, b) => b.value - a.value);
+    }
+    return data;
+  }, []);
+
+  useEffect(() => {
+    setCollectionData((prevData) => sortData(prevData, sortOrder));
+  }, [sortOrder, sortData]);
+
   const handleDownload = async () => {
     console.log("Download button clicked");
     let png;
     try {
       if (selectedTab === "bar") {
         console.log("Generating PNG for bar chart");
-        png = await getBarPng();
-        console.log("Generated bar chart PNG:", png);
+        setBarFillColor("black");
+        requestAnimationFrame(async () => {
+          png = await getBarPng();
+          console.log("Generated bar chart PNG:", png);
+          setBarFillColor("currentColor");
+
+          if (png) {
+            console.log("PNG generated, starting download");
+            FileSaver.saveAs(png, `${selectedCollection}-${selectedMetric}-chart.png`);
+            console.log("Download initiated");
+          } else {
+            console.log("Failed to generate PNG");
+          }
+        });
       } else if (selectedTab === "pie") {
         console.log("Generating PNG for pie chart");
         png = await getPiePng();
         console.log("Generated pie chart PNG:", png);
-      }
 
-      if (png) {
-        console.log("PNG generated, starting download");
-        FileSaver.saveAs(png, `${selectedCollection}-${selectedMetric}-chart.png`);
-        console.log("Download initiated");
-      } else {
-        console.log("Failed to generate PNG");
+        if (png) {
+          console.log("PNG generated, starting download");
+          FileSaver.saveAs(png, `${selectedCollection}-${selectedMetric}-chart.png`);
+          console.log("Download initiated");
+        } else {
+          console.log("Failed to generate PNG");
+        }
       }
     } catch (error) {
       console.error("Error during PNG generation or download:", error);
@@ -320,7 +297,7 @@ export default function DataPage({}: Props) {
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = collectionData.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = sortData(collectionData.slice(indexOfFirstItem, indexOfLastItem), sortOrder);
 
   const totalPages = Math.ceil(collectionData.length / itemsPerPage);
 
@@ -338,7 +315,16 @@ export default function DataPage({}: Props) {
 
   const renderPagination = () => {
     const pageNumbers = [];
-    for (let i = 1; i <= totalPages; i++) {
+    const maxPageNumbers = 3;
+    const halfMaxPageNumbers = Math.floor(maxPageNumbers / 2);
+    let startPage = Math.max(currentPage - halfMaxPageNumbers, 1);
+    let endPage = Math.min(startPage + maxPageNumbers - 1, totalPages);
+
+    if (endPage - startPage < maxPageNumbers - 1) {
+      startPage = Math.max(endPage - maxPageNumbers + 1, 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
       pageNumbers.push(i);
     }
 
@@ -375,8 +361,8 @@ export default function DataPage({}: Props) {
   return (
     <div className="flex flex-col gap-5 w-full h-full">
       <PageTitle title="Graph Builder" />
-      <section className="grid w-full h-full grid-cols-1 gap-4 transition-all sm:grid-cols-1  sm:grid-cols-5 xl:grid-cols-5">
-        <CardContent className="col-span-1 gap-4 p-6 sm:p-6 md:p-8 lg:p-8 xl:p-10">
+      <section className="grid w-full h-full grid-cols-1  gap-4 transition-all lg:grid-cols-5 xl:grid-cols-5">
+        <CardContent className="col-span-1 lg:col-span-2 xl:col-span-1 gap-4 p-4 sm:p-4 md:p-6 lg:p-8 xl:p-10">
           <div className="space-y-6">
             <div>
               <h3 className="text-xl font-medium">Query</h3>
@@ -459,10 +445,29 @@ export default function DataPage({}: Props) {
                 </Select>
               </div>
             )}
+
+            {selectedMetric && (
+              <div className="space-y-3">
+                <Label>Sort By</Label>
+                <Select onValueChange={setSortOrder}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select sort order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectScrollUpButton />
+                    <SelectGroup>
+                      <SelectItem value="ascending">Ascending</SelectItem>
+                      <SelectItem value="descending">Descending</SelectItem>
+                    </SelectGroup>
+                    <SelectScrollDownButton />
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </CardContent>
 
-        <CardContent className="col-span-4 gap-4 p-6 sm:p-6 md:p-8 lg:p-8 xl:p-10">
+        <CardContent className="col-span-1  md:col-span-1 lg:col-span-3 xl:col-span-4 gap-4 p-6 sm:p-6 md:p-8 lg:p-8 xl:p-10 ">
           <Tabs value={selectedTab} onValueChange={setSelectedTab}>
             <div className="flex justify-between">
               <TabsList>
@@ -495,7 +500,7 @@ export default function DataPage({}: Props) {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {currentItems.map((item) => (
+                          {currentItems.map((item: Item) => (
                             <TableRow key={item.name}>
                               <TableCell>{item.name}</TableCell>
                               <TableCell>{item.value}</TableCell>
@@ -524,6 +529,7 @@ export default function DataPage({}: Props) {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
                             <YAxis
+                              domain={[0, (dataMax: number) => Math.ceil(dataMax / 5) * 5]}
                               label={{
                                 value: getYAxisLabel(),
                                 angle: -90,
@@ -534,7 +540,7 @@ export default function DataPage({}: Props) {
                             <Legend />
                             <Bar
                               dataKey="value"
-                              fill="currentColor"
+                              fill={barFillColor}
                               radius={[6, 6, 0, 0]}
                               name={getLegendName()}
                             />

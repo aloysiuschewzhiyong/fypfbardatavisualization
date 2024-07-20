@@ -56,12 +56,12 @@ export default function SideNavbar({}: Props) {
             icon: FileClock,
             variant: "ghost",
           },
-          {
-            title: "Users",
-            href: "/users",
-            icon: Users2,
-            variant: "ghost",
-          },
+          // {
+          //   title: "Users",
+          //   href: "/users",
+          //   icon: Users2,
+          //   variant: "ghost",
+          // },
           {
             title: "Settings",
             href: "/settings",

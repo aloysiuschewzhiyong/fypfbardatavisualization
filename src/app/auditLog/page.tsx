@@ -75,20 +75,38 @@ export default function AuditPage({}: Props) {
   // Calculate total pages
   const totalPages = Math.ceil(auditData.length / itemsPerPage);
 
-  // Generate pagination items
-  const paginationItems = [];
-  for (let i = 1; i <= totalPages; i++) {
-    paginationItems.push(
-      <PaginationItem key={i}>
-        <PaginationLink
-          isActive={currentPage === i}
-          onClick={() => paginate(i)}
-        >
-          {i}
-        </PaginationLink>
-      </PaginationItem>
-    );
-  }
+  // Generate pagination items with 3 page numbers at a time
+  const generatePaginationItems = () => {
+    const paginationItems = [];
+    const maxPageNumbers = 3;
+    const halfRange = Math.floor(maxPageNumbers / 2);
+
+    let startPage = Math.max(currentPage - halfRange, 1);
+    let endPage = Math.min(currentPage + halfRange, totalPages);
+
+    if (endPage - startPage + 1 < maxPageNumbers) {
+      if (currentPage <= halfRange) {
+        endPage = Math.min(maxPageNumbers, totalPages);
+      } else if (currentPage + halfRange >= totalPages) {
+        startPage = Math.max(totalPages - maxPageNumbers + 1, 1);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      paginationItems.push(
+        <PaginationItem key={i}>
+          <PaginationLink
+            isActive={currentPage === i}
+            onClick={() => paginate(i)}
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    return paginationItems;
+  };
 
   return (
     <div className="flex flex-col gap-5 w-full h-full">
@@ -112,7 +130,7 @@ export default function AuditPage({}: Props) {
                 onClick={() => paginate(currentPage > 1 ? currentPage - 1 : 1)}
                 className={currentPage === 1 ? 'invisible' : ''}
               />
-              {paginationItems}
+              {generatePaginationItems()}
               <PaginationNext
                 onClick={() => paginate(currentPage < totalPages ? currentPage + 1 : totalPages)}
                 className={currentPage === totalPages ? 'invisible' : ''}

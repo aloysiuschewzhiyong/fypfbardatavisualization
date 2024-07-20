@@ -1,3 +1,4 @@
+// src/app/settings/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -12,7 +13,8 @@ import {
   handleEmailChange,
   handlePasswordChange,
   sendEmailVerification,
-} from "@/app/firebase"; // Adjust the import path as needed
+  completeEmailUpdate,
+} from "@/app/firebase";
 import { User } from "firebase/auth";
 import { Separator } from "@/components/ui/separator";
 import { ProfileForm } from "@/components/ui/profile-form";
@@ -24,7 +26,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner"; // Import Sonner's toast
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import {
   Form,
@@ -46,6 +48,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useAuditAlert, AuditAlertProvider } from "@/components/ui/AuditContext";
 
 enum EditState {
   None,
@@ -71,7 +74,7 @@ const emailFormSchema = z.object({
   }),
   currentPassword: z.string().min(8, {
     message: "Current password must be at least 8 characters.",
-  }), // Add this field
+  }),
 });
 
 const passwordFormSchema = z.object({
@@ -87,7 +90,8 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 type EmailFormValues = z.infer<typeof emailFormSchema>;
 type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
-export default function SettingsPage() {
+const SettingsPageContent = () => {
+  const { auditEnabled, setAuditEnabled } = useAuditAlert();
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any | null>(null);
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
@@ -152,12 +156,11 @@ export default function SettingsPage() {
     try {
       await handleUsernameChange(user.uid, pendingUsername);
       toast.success("Username updated successfully.");
-      // Fetch updated user data
       const updatedUserData = await getUserData(user.uid);
       setUserData(updatedUserData);
-      setEditState(EditState.None); // Reset the edit state
+      setEditState(EditState.None);
       setPendingUsername(null);
-      setIsDialogOpen(false); // Close the dialog
+      setIsDialogOpen(false);
     } catch (error) {
       toast.error("There was an error updating the username.");
     }
@@ -168,16 +171,15 @@ export default function SettingsPage() {
       toast.error("User is not authenticated or no email provided.");
       return;
     }
-  
+
     try {
       await handleEmailChange(user, pendingEmail, currentPassword);
-      await sendEmailVerification(user);
       setIsVerificationSent(true);
       setIsAwaitingEmailConfirmation(true);
       console.log("Email verification sent.");
       toast.success("Email updated successfully. Please check your email to verify the new address.");
-    } catch (error) {
-      toast.error("There was an error updating the email.");
+    } catch (error: any) {
+      toast.error(error.message || "There was an error updating the email.");
     }
   }
 
@@ -188,21 +190,16 @@ export default function SettingsPage() {
     }
 
     try {
-      await user.reload();
-      if (user.emailVerified) {
-        // Fetch updated user data
-        const updatedUserData = await getUserData(user.uid);
-        setUserData(updatedUserData);
-        setEditState(EditState.None); // Reset the edit state
-        setPendingEmail(null);
-        setIsDialogOpen(false); // Close the dialog
-        setIsAwaitingEmailConfirmation(false);
-        toast.success("Email verified and updated successfully.");
-      } else {
-        toast.error("Email has not been verified yet.");
-      }
-    } catch (error) {
-      toast.error("There was an error checking email verification.");
+      await completeEmailUpdate(user, pendingEmail!);
+      const updatedUserData = await getUserData(user.uid);
+      setUserData(updatedUserData);
+      setEditState(EditState.None);
+      setPendingEmail(null);
+      setIsDialogOpen(false);
+      setIsAwaitingEmailConfirmation(false);
+      toast.success("Email verified and updated successfully.");
+    } catch (error: any) {
+      toast.error(error.message || "There was an error checking email verification.");
     }
   }
 
@@ -215,9 +212,9 @@ export default function SettingsPage() {
     try {
       await handlePasswordChange(user, currentPassword, pendingPassword);
       toast.success("Password updated successfully.");
-      setEditState(EditState.None); // Reset the edit state
+      setEditState(EditState.None);
       setPendingPassword(null);
-      setIsDialogOpen(false); // Close the dialog
+      setIsDialogOpen(false);
     } catch (error) {
       toast.error("There was an error updating the password.");
     }
@@ -228,16 +225,32 @@ export default function SettingsPage() {
     setIsDialogOpen(true);
   };
 
-  const handleEmailFormSubmit = (data: EmailFormValues) => {
-    setPendingEmail(data.email);
-    setCurrentPassword(data.currentPassword); // Add this line
-    setIsDialogOpen(true);
+  const handleEmailFormSubmit = async (data: EmailFormValues) => {
+    console.log('Email form submitted with data:', data);
+
+    if (user) {
+      console.log('Authenticated user:', user);
+      try {
+        await handleEmailChange(user, data.email, data.currentPassword);
+        toast.success("Email updated successfully. Please check your email to verify the new address.");
+      } catch (error: any) {
+        console.error('Email update error:', error);
+        toast.error(error.message);
+      }
+    } else {
+      console.error('User is not authenticated.');
+      toast.error("User is not authenticated.");
+    }
   };
 
   const handlePasswordFormSubmit = (data: PasswordFormValues) => {
     setPendingPassword(data.newPassword);
     setCurrentPassword(data.currentPassword);
     setIsDialogOpen(true);
+  };
+
+  const handleAuditToggle = (value: string) => {
+    setAuditEnabled(value === "option-one");
   };
 
   return (
@@ -254,7 +267,7 @@ export default function SettingsPage() {
               </p>
             </div>
             <Separator />
-            <div className="flex flex-row items-center">
+            <div className="flex flex-row items-center px-4">
               <Avatar>
                 <AvatarImage
                   src={
@@ -339,83 +352,82 @@ export default function SettingsPage() {
                   </form>
                 </Form>
               ) : editState === EditState.Email ? (
-<Form {...emailForm}>
-  <form
-    onSubmit={emailForm.handleSubmit(handleEmailFormSubmit)}
-    className="space-y-8"
-    autoComplete="off"
-  >
-    <FormField
-      control={emailForm.control}
-      name="email"
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>Change Email</FormLabel>
-          <FormControl>
-            <Input
-              placeholder="email"
-              {...field}
-              autoComplete="new-email"
-            />
-          </FormControl>
-          <FormDescription>
-            This will change your email address.
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-    <FormField
-      control={emailForm.control}
-      name="currentPassword"
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>Current Password</FormLabel>
-          <FormControl>
-            <Input
-              type="password"
-              placeholder="current password"
-              {...field}
-              autoComplete="current-password"
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-    <div className="flex space-x-4">
-      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <AlertDialogTrigger asChild>
-          <Button type="submit">Update Email</Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Change?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will change your email address.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsDialogOpen(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleEmailUpdate}>
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={handleCancel}
-      >
-        Cancel
-      </Button>
-    </div>
-  </form>
-</Form>
-
+                <Form {...emailForm}>
+                  <form
+                    onSubmit={emailForm.handleSubmit(handleEmailFormSubmit)}
+                    className="space-y-8"
+                    autoComplete="off"
+                  >
+                    <FormField
+                      control={emailForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Change Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="email"
+                              {...field}
+                              autoComplete="new-email"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            This will change your email address.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={emailForm.control}
+                      name="currentPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Current Password</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder="current password"
+                              {...field}
+                              autoComplete="current-password"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex space-x-4">
+                      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                        <AlertDialogTrigger asChild>
+                          <Button type="submit">Update Email</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm Change?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will change your email address.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setIsDialogOpen(false)}>
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction onClick={handleEmailUpdate}>
+                              Continue
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleCancel}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
               ) : editState === EditState.Password ? (
                 <Form {...passwordForm}>
                   <form
@@ -518,7 +530,7 @@ export default function SettingsPage() {
                         </div>
                         <Separator className="h-[0.5px]" />
                       </div>
-        
+
                       <div className="space-y-3">
                         <div className="flex flex-row justify-between items-center mt-4">
                           <p className="text-sm md:text-md lg:text-md xl:text-md px-6 ">
@@ -530,7 +542,7 @@ export default function SettingsPage() {
                         </div>
                         <Separator className="h-[0.5px]" />
                       </div>
-        
+
                       <div className="space-y-3">
                         <div className="flex flex-row justify-between items-center mt-4">
                           <p className="text-sm md:text-md lg:text-md xl:text-md  px-6 ">
@@ -568,8 +580,9 @@ export default function SettingsPage() {
             <div className="space-y-3 my-2">
               <Label>Enable audit alerts</Label>
               <RadioGroup
-                defaultValue="option-one"
+                defaultValue="option-two"
                 className="flex flex-row space-x-4"
+                onValueChange={handleAuditToggle}
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="option-one" id="option-one" />
@@ -592,5 +605,13 @@ export default function SettingsPage() {
         </CardContent>
       </section>
     </div>
+  );
+};
+
+export default function SettingsPage() {
+  return (
+    <AuditAlertProvider>
+      <SettingsPageContent />
+    </AuditAlertProvider>
   );
 }
