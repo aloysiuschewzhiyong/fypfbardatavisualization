@@ -61,7 +61,8 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
         return `Updated a campaign: ${campaignName || props.object}`;
       case 'delete campaign':
         return `Deleted a campaign: ${campaignName || props.object}`;
-      // Add more cases as needed
+     case 'Profile Picture Request':
+      return `Requesting profile picture approval`;
       default:
         return `${props.action} ${campaignName || props.object}`;
     }
