@@ -63,7 +63,9 @@ const HomeContent: React.FC = () => {
 
         const currentCampaigns = currentMonthCampaign ? currentMonthCampaign.campaigns : 0;
         const lastCampaigns = lastMonthCampaign ? lastMonthCampaign.campaigns : 0;
-        const percentageDiff = lastCampaigns ? ((currentCampaigns - lastCampaigns) / lastCampaigns * 100) : currentCampaigns * 100;
+        const percentageDiff = lastCampaigns === 0
+          ? currentCampaigns * 100
+          : ((currentCampaigns - lastCampaigns) / lastCampaigns * 100);
 
         console.log('Current Month:', currentMonthName, 'Current Campaigns:', currentCampaigns); // Log current month campaigns
         console.log('Last Month:', lastMonthName, 'Last Campaigns:', lastCampaigns); // Log last month campaigns
@@ -131,12 +133,6 @@ const HomeContent: React.FC = () => {
   }, []);
 
   const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
-
-  const formatPercentage = (percentage: number) => {
-    if (percentage === null) return "Loading...";
-    if (percentage === 0) return "+0.0%";
-    return percentage > 0 ? `+${percentage.toFixed(1)}%` : `${percentage.toFixed(1)}%`;
-  };
 
   const cardData: CardProps[] = [
     {
@@ -272,3 +268,9 @@ const HomeContent: React.FC = () => {
 };
 
 export default HomeContent;
+
+const formatPercentage = (percentage: number) => {
+  if (percentage === null) return "Loading...";
+  if (percentage === 0) return "+0.0%";
+  return percentage > 0 ? `+${percentage.toFixed(1)}%` : `${percentage.toFixed(1)}%`;
+};

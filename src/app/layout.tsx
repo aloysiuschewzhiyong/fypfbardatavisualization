@@ -1,11 +1,10 @@
-"use client"
-import React, { ReactNode } from 'react';
+"use client";
+import React, { ReactNode, useEffect, useState, useRef, useCallback } from 'react';
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import SideNavbar from "@/components/SideNavbar";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useCallback, useState, useRef } from "react";
 import { checkAuthState, getAuditInfoRealtime, AuditData } from "@/app/firebase";
 import { metadata } from "./metadata";
 import { ThemeProvider } from "@/components/ui/theme-provider";
@@ -26,7 +25,7 @@ const RootLayout = ({ children }: RootLayoutProps) => {
 
   const { auditEnabled } = useAuditAlert();
   const [latestAuditTime, setLatestAuditTime] = useState<number | null>(null);
-  const listenerAddedRef = useRef(false);
+  const lastAuditRef = useRef<AuditData | null>(null); // Track the last shown audit
 
   const getString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
@@ -34,17 +33,20 @@ const RootLayout = ({ children }: RootLayoutProps) => {
   const description: string = getString(metadata.description);
 
   const showAuditUpdateToast = useCallback((audit: AuditData) => {
-    toast(
-      `Audit log updated: ${audit.action} ${audit.object}`,
-      {
-        duration: 3000,
-        action: {
-          label: <X size={12} />,
-          onClick: () => toast.dismiss(),
-        },
-      }
-    );
-  }, []);
+    if (auditEnabled) {
+      console.log("Showing toast for audit:", audit);
+      toast(
+        `Audit log updated: ${audit.action} ${audit.object}`,
+        {
+          duration: 3000,
+          action: {
+            label: <X size={12} />,
+            onClick: () => toast.dismiss(),
+          },
+        }
+      );
+    }
+  }, [auditEnabled]);
 
   useEffect(() => {
     const unsubscribeAuth = checkAuthState((user) => {
@@ -55,27 +57,44 @@ const RootLayout = ({ children }: RootLayoutProps) => {
       }
     });
 
-    if (!listenerAddedRef.current && auditEnabled) {
-      listenerAddedRef.current = true;
+    return () => {
+      if (unsubscribeAuth) {
+        unsubscribeAuth();
+      }
+    };
+  }, [router, isAuthPage]);
 
-      getAuditInfoRealtime((audits: AuditData[]) => {
+  useEffect(() => {
+    console.log("useEffect triggered for audit listener setup");
+
+    let unsubscribe: (() => void) | null = null;
+
+    if (auditEnabled) {
+      unsubscribe = getAuditInfoRealtime((audits: AuditData[]) => {
+        console.log("Received audits:", audits);
         if (audits.length > 0) {
           const mostRecentAudit = audits[0];
           const auditTime = new Date(mostRecentAudit.time).getTime();
+
           if (!latestAuditTime || auditTime > latestAuditTime) {
-            setLatestAuditTime(auditTime);
-            showAuditUpdateToast(mostRecentAudit);
+            if (!lastAuditRef.current || lastAuditRef.current.time !== mostRecentAudit.time) {
+              console.log("New audit time detected:", auditTime);
+              setLatestAuditTime(auditTime);
+              lastAuditRef.current = mostRecentAudit;
+              showAuditUpdateToast(mostRecentAudit);
+            }
           }
         }
       });
     }
 
     return () => {
-      if (unsubscribeAuth) {
-        unsubscribeAuth();
+      console.log("Cleaning up audit listeners");
+      if (unsubscribe) {
+        unsubscribe();
       }
     };
-  }, [router, isAuthPage, showAuditUpdateToast, latestAuditTime, auditEnabled]);
+  }, [showAuditUpdateToast, latestAuditTime, auditEnabled]);
 
   return (
     <html lang="en">

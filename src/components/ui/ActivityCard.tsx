@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { getProfilePictureURL, getUserData, getCampaignDetailsRealtime } from '@/app/firebase';
-import { Timestamp } from 'firebase/firestore'; // Import the Timestamp type
+import React, { useEffect, useState } from "react";
+import {
+  getProfilePictureURL,
+  getUserData,
+  getCampaignDetailsRealtime,
+} from "@/app/firebase";
+import { Timestamp } from "firebase/firestore"; // Import the Timestamp type
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import Image from 'next/image';
+import Image from "next/image";
 
 export type AuditProps = {
   uid: string;
@@ -12,13 +16,18 @@ export type AuditProps = {
 };
 
 const ActivityCard: React.FC<AuditProps> = (props) => {
-  const [profilePictureURL, setProfilePictureURL] = useState<string | null>(null);
-  const [userData, setUserData] = useState<{ username: string | null, email: string | null }>({ username: null, email: null });
+  const [profilePictureURL, setProfilePictureURL] = useState<string | null>(
+    null
+  );
+  const [userData, setUserData] = useState<{
+    username: string | null;
+    email: string | null;
+  }>({ username: null, email: null });
   const [campaignName, setCampaignName] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       setIsClient(true);
     }
 
@@ -27,7 +36,7 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
         const url = await getProfilePictureURL(props.uid);
         setProfilePictureURL(url);
       } catch (error) {
-        console.error('Error fetching profile picture:', error);
+        console.error("Error fetching profile picture:", error);
       }
     };
 
@@ -36,12 +45,16 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
         const data = await getUserData(props.uid);
         setUserData(data);
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error("Error fetching user data:", error);
       }
     };
 
     const listenToCampaignDetails = () => {
-      if (['create campaign', 'edit campaign', 'delete campaign'].includes(props.action)) {
+      if (
+        ["create campaign", "edit campaign", "delete campaign"].includes(
+          props.action
+        )
+      ) {
         getCampaignDetailsRealtime(props.object, (campaignDetails) => {
           setCampaignName(campaignDetails.campaignName);
         });
@@ -55,14 +68,26 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
 
   const getActionDescription = () => {
     switch (props.action) {
-      case 'create campaign':
+      case "create campaign":
         return `Created a campaign: ${campaignName || props.object}`;
-      case 'edit campaign':
+      case "edit campaign":
         return `Updated a campaign: ${campaignName || props.object}`;
-      case 'delete campaign':
+      case "delete campaign":
         return `Deleted a campaign: ${campaignName || props.object}`;
-     case 'Profile Picture Request':
-      return `Requesting profile picture approval`;
+      case "Profile Picture Request":
+        return `Requesting profile picture approval`;
+      case "Delete Org":
+        return `Deleted an organization: ${props.object}`;
+      case "Update Org":
+        return `Updated an organization: ${props.object}`;
+      case "Add Org":
+        return `Added an organization: ${props.object}`;
+        case "Delete Vendor":
+          return `Deleted a vendor: ${props.object}`;
+        case "Update Vendor":
+          return `Updated a vendor: ${props.object}`;
+        case "Add Vendor":
+          return `Added a vendor: ${props.object}`;
       default:
         return `${props.action} ${campaignName || props.object}`;
     }
@@ -73,7 +98,7 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
       return null;
     }
     return (
-      <p className='text-gray-400 text-sm'>
+      <p className="text-gray-400 text-sm">
         {new Date(props.timestamp.seconds * 1000).toLocaleString()}
       </p>
     );
@@ -84,20 +109,31 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
       <section className="flex justify-between gap-3 items-center">
         <div className="h-12 w-12 rounded-full bg-gray-100 p-1">
           {profilePictureURL ? (
-            <Image loading="lazy" width={350} height={350} src={profilePictureURL} alt="avatar" className="rounded-full" />
+            <Image
+              loading="lazy"
+              width={350}
+              height={350}
+              src={profilePictureURL}
+              alt="avatar"
+              className="rounded-full"
+            />
           ) : (
-            <div className="h-full w-full flex items-center justify-center text-gray-400">No Image</div>
+            <div className="h-full w-full flex items-center justify-center text-gray-400">
+              No Image
+            </div>
           )}
         </div>
         <div className="text-sm">
-          <p className='font-medium'>{userData.username ? userData.username : props.uid}</p>
+          <p className="font-medium">
+            {userData.username ? userData.username : props.uid}
+          </p>
           <div className="text-ellipsis overflow-hidden whitespace-nowrap w-[120px] sm:w-auto text-gray-400">
-            {userData.email ? userData.email : 'No Email'}
+            {userData.email ? userData.email : "No Email"}
           </div>
         </div>
       </section>
-      <div className='flex flex-col items-end'>
-        <p className='font-medium text-sm sm:text-sm md:text-md lg:text-md xl:text-md'> 
+      <div className="flex flex-col items-end">
+        <p className="font-medium text-sm sm:text-sm md:text-md lg:text-md xl:text-md">
           {getActionDescription()}
         </p>
         {renderDateTime()}

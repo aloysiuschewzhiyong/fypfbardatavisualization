@@ -510,11 +510,11 @@ export function getCampaignDetailsRealtime(
 
 export function getAuditInfoRealtime(
   callback: (data: AuditData[]) => void
-): void {
+): () => void {
   const auditRef = collection(db, "audit");
   const auditQuery = query(auditRef, orderBy("time", "desc"));
 
-  onSnapshot(
+  const unsubscribe = onSnapshot(
     auditQuery,
     (snapshot) => {
       const audits: AuditData[] = snapshot.docs.map((doc) => {
@@ -535,6 +535,8 @@ export function getAuditInfoRealtime(
       console.error("Error fetching audit info:", error);
     }
   );
+
+  return unsubscribe;
 }
 
 export async function getCountOfDocumentsByField(

@@ -1,4 +1,3 @@
-// src/app/settings/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -48,7 +47,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useAuditAlert, AuditAlertProvider } from "@/components/ui/AuditContext";
+import { useAuditAlert } from "@/components/ui/AuditContext"; // Ensure correct import
 
 enum EditState {
   None,
@@ -90,7 +89,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 type EmailFormValues = z.infer<typeof emailFormSchema>;
 type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
-const SettingsPageContent = () => {
+const SettingsPage = () => {
   const { auditEnabled, setAuditEnabled } = useAuditAlert();
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any | null>(null);
@@ -250,7 +249,7 @@ const SettingsPageContent = () => {
   };
 
   const handleAuditToggle = (value: string) => {
-    setAuditEnabled(value === "option-one");
+    setAuditEnabled(value === "true");
   };
 
   return (
@@ -580,17 +579,17 @@ const SettingsPageContent = () => {
             <div className="space-y-3 my-2">
               <Label>Enable audit alerts</Label>
               <RadioGroup
-                defaultValue="option-two"
+                value={auditEnabled ? "true" : "false"}
                 className="flex flex-row space-x-4"
                 onValueChange={handleAuditToggle}
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="option-one" id="option-one" />
-                  <Label htmlFor="option-one">Yes</Label>
+                  <RadioGroupItem value="true" id="option-true" />
+                  <Label htmlFor="option-true">Yes</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="option-two" id="option-two" />
-                  <Label htmlFor="option-two">No</Label>
+                  <RadioGroupItem value="false" id="option-false" />
+                  <Label htmlFor="option-false">No</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -608,10 +607,4 @@ const SettingsPageContent = () => {
   );
 };
 
-export default function SettingsPage() {
-  return (
-    <AuditAlertProvider>
-      <SettingsPageContent />
-    </AuditAlertProvider>
-  );
-}
+export default SettingsPage;
