@@ -456,6 +456,7 @@ export default function DataPage({}: Props) {
                   <SelectContent>
                     <SelectScrollUpButton />
                     <SelectGroup>
+                    <SelectItem value="none">None</SelectItem>
                       <SelectItem value="ascending">Ascending</SelectItem>
                       <SelectItem value="descending">Descending</SelectItem>
                     </SelectGroup>
@@ -529,7 +530,7 @@ export default function DataPage({}: Props) {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
                             <YAxis
-                              domain={[0, (dataMax: number) => Math.ceil(dataMax / 5) * 5]}
+                              domain={[0, (dataMax: number) => Math.ceil(dataMax / 5) * 5 + 1]}
                               label={{
                                 value: getYAxisLabel(),
                                 angle: -90,
@@ -543,8 +544,9 @@ export default function DataPage({}: Props) {
                               fill={barFillColor}
                               radius={[6, 6, 0, 0]}
                               name={getLegendName()}
-                            />
+                            >
                             <LabelList dataKey="value" position="top" />
+                            </Bar>
                           </BarChart>
                         </ChartContainer>
                       </div>
