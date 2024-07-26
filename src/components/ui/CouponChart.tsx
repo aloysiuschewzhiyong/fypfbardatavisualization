@@ -85,7 +85,7 @@ const CouponChart: React.FC = () => {
 
         <ChartContainer
           config={chartConfig}
-          className="mx-auto aspect-square max-h-[250px]"
+          className="mx-auto aspect-square mt-4 max-h-[250px]"
         >
           <PieChart>
             <Tooltip content={<ChartTooltipContent hideLabel />} />
@@ -94,7 +94,7 @@ const CouponChart: React.FC = () => {
               dataKey="value"
               nameKey="name"
               innerRadius={55}
-              outerRadius={80}
+              outerRadius={75}
               label
               labelLine={false}
             >

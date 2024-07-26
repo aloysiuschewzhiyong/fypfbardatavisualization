@@ -353,6 +353,8 @@ export async function getCouponUserCountsRedeemed(): Promise<{
 
     const userInventories: { [userId: string]: any[] } = {};
 
+    console.log("Fetching user inventories...");
+
     for (const userDoc of usersSnapshot.docs) {
       const userInventoryRef = collection(db, `users/${userDoc.id}/inventory`);
       const userInventorySnapshot = await getDocs(userInventoryRef);
@@ -360,11 +362,17 @@ export async function getCouponUserCountsRedeemed(): Promise<{
         id: doc.id,
         data: doc.data(),
       }));
+
+      console.log(`User ${userDoc.id} inventory:`, userInventories[userDoc.id]);
     }
+
+    console.log("Processing coupons...");
 
     for (const couponDoc of couponsSnapshot.docs) {
       const couponData = couponDoc.data();
       const couponName = couponData.couponName;
+
+      console.log(`Processing coupon: ${couponName}`);
 
       couponUserCounts[couponName] = 0;
 
@@ -372,24 +380,58 @@ export async function getCouponUserCountsRedeemed(): Promise<{
         const userInventory = userInventories[userId];
 
         for (const inventoryItem of userInventory) {
+          console.log(
+            `Checking inventory item: ${inventoryItem.id}, Redeemed: ${inventoryItem.data.redeemed}`
+          );
           if (
             inventoryItem.id === couponDoc.id &&
             inventoryItem.data.redeemed
           ) {
+            console.log(
+              `User ${userId} has redeemed coupon ${couponName} (Coupon ID: ${couponDoc.id})`
+            );
             couponUserCounts[couponName]++;
             break;
           }
         }
       }
+
+      console.log(`Count for ${couponName}: ${couponUserCounts[couponName]}`);
     }
 
-    console.log("Coupon user counts:", couponUserCounts);
+    // Check for deleted coupons
+    for (const userId in userInventories) {
+      const userInventory = userInventories[userId];
+
+      for (const inventoryItem of userInventory) {
+        if (inventoryItem.data.redeemed) {
+          const couponDocRef = firestoreDoc(db, "couponFRFR", inventoryItem.id);
+          const couponDoc = await getDoc(couponDocRef);
+
+          if (!couponDoc.exists()) {
+            const couponName = "deleted coupon";
+            if (!couponUserCounts[couponName]) {
+              couponUserCounts[couponName] = 0;
+            }
+            couponUserCounts[couponName]++;
+            console.log(
+              `User ${userId} has redeemed a deleted coupon (Coupon ID: ${inventoryItem.id})`
+            );
+          }
+        }
+      }
+    }
+
+    console.log("Final coupon user counts:", couponUserCounts);
     return couponUserCounts;
   } catch (error) {
     console.error("Error fetching coupon user counts:", error);
     throw error;
   }
 }
+
+
+
 
 interface ChartData {
   month: string;
@@ -539,6 +581,7 @@ export function getAuditInfoRealtime(
   return unsubscribe;
 }
 
+
 export async function getCountOfDocumentsByField(
   collectionName: string,
   field: string,
@@ -555,6 +598,30 @@ export async function getCountOfDocumentsByField(
   const snapshot = await getDocs(collectionRef);
   console.log("Total documents fetched:", snapshot.size);
 
+  const getCampaignName = async (campaignId: string) => {
+    const campaignDocRef = firestoreDoc(db, "campaign", campaignId);
+    const campaignDoc = await getDoc(campaignDocRef);
+    return campaignDoc.exists() ? campaignDoc.data().campaignName : "unknown campaign";
+  };
+
+
+  const getVendorName = async (vendorId: string) => {
+    const vendorDocRef = firestoreDoc(db, "vendors", vendorId);
+    const vendorDoc = await getDoc(vendorDocRef);
+    return vendorDoc.exists() ? vendorDoc.data().vendorName : "deleted vendor";
+  };
+
+  const getOrgName = async (orgId: string) => {
+    if (orgId === "all") {
+      return "all";
+    }
+    const orgDocRef = firestoreDoc(db, "organizations", orgId);
+    const orgDoc = await getDoc(orgDocRef);
+    return orgDoc.exists() ? orgDoc.data().organizationName : "deleted organization";
+  };
+
+
+
   if (collectionName === "couponFRFR" && metric === "Issuance count") {
     try {
       const notificationsRef = collection(db, "notifications");
@@ -564,26 +631,120 @@ export async function getCountOfDocumentsByField(
       for (const notificationDoc of notificationsSnapshot.docs) {
         const notificationData = notificationDoc.data();
         const couponId = notificationData.couponID;
-        const campaignId = notificationData.campaignID;
-
-        const fieldValue = field === "couponName" ? couponId : campaignId;
-
-        if (!fieldCounts[fieldValue]) {
-          fieldCounts[fieldValue] = 0;
+        if (!couponId) {
+          console.warn(`Notification ${notificationDoc.id} has undefined couponID`);
+          continue;
         }
 
-        const notifReceiversRef = collection(
-          db,
-          `notifications/${notificationDoc.id}/notifReceivers`
-        );
-        const notifReceiversSnapshot = await getDocs(notifReceiversRef);
-        console.log("Receivers for notification:", notificationDoc.id, ":", notifReceiversSnapshot.size);
+        const couponDocRef = firestoreDoc(db, "couponFRFR", couponId);
+        const couponDoc = await getDoc(couponDocRef);
 
-        fieldCounts[fieldValue] += notifReceiversSnapshot.size;
-        console.log("Updated count for fieldValue", fieldValue, ":", fieldCounts[fieldValue]);
+        if (couponDoc.exists()) {
+          const couponData = couponDoc.data();
+          let fieldValue = couponData[field];
+
+          if (field === "campaignID" && fieldValue) {
+            fieldValue = await getCampaignName(fieldValue);
+          }
+
+          if (!fieldCounts[fieldValue]) {
+            fieldCounts[fieldValue] = 0;
+          }
+
+          const notifReceiversRef = collection(
+            db,
+            `notifications/${notificationDoc.id}/notifReceivers`
+          );
+          const notifReceiversSnapshot = await getDocs(notifReceiversRef);
+          console.log("Receivers for notification:", notificationDoc.id, ":", notifReceiversSnapshot.size);
+
+          fieldCounts[fieldValue] += notifReceiversSnapshot.size;
+          console.log("Updated issuance count for fieldValue", fieldValue, ":", fieldCounts[fieldValue]);
+        } else {
+          console.log(`Coupon document for coupon ID ${couponId} does not exist.`);
+          const fieldValue = field === "campaignID" ? "deleted campaign" : "deleted coupon";
+
+
+          if (!fieldCounts[fieldValue]) {
+            fieldCounts[fieldValue] = 0;
+          }
+          fieldCounts[fieldValue]++;
+          console.log("Updated issuance count for Deleted coupon:", fieldCounts[fieldValue]);
+        }
       }
     } catch (error) {
       console.error("Error fetching notifications or receivers:", error);
+    }
+  } else if (collectionName === "couponFRFR" && metric === "Redemption count") {
+    try {
+      const usersRef = collection(db, "users");
+      const usersSnapshot = await getDocs(usersRef);
+      console.log("Users fetched:", usersSnapshot.size);
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+        const userInventoryRef = collection(db, `users/${userId}/inventory`);
+        const userInventorySnapshot = await getDocs(userInventoryRef);
+        console.log(`User ${userId} inventory items fetched:`, userInventorySnapshot.size);
+
+        for (const inventoryDoc of userInventorySnapshot.docs) {
+          const inventoryData = inventoryDoc.data();
+          if (inventoryData.redeemed) {
+            const couponId = inventoryDoc.id;
+            console.log(`Inventory item ${inventoryDoc.id} is redeemed. Coupon ID: ${couponId}`);
+
+            const couponDocRef = firestoreDoc(db, "couponFRFR", couponId);
+            const couponDoc = await getDoc(couponDocRef);
+
+            if (couponDoc.exists()) {
+              const couponData = couponDoc.data();
+              let fieldValue = couponData[field];
+
+              if (field === "campaignID" && fieldValue) {
+                fieldValue = await getCampaignName(fieldValue);
+              }
+
+              console.log("Coupon data:", couponData);
+              console.log("Field value:", fieldValue);
+
+              if (!fieldCounts[fieldValue]) {
+                fieldCounts[fieldValue] = 0;
+              }
+
+              fieldCounts[fieldValue]++;
+              console.log("Updated redemption count for fieldValue", fieldValue, ":", fieldCounts[fieldValue]);
+            } else {
+              console.log(`Coupon document for coupon ID ${couponId} does not exist.`);
+              const fieldValue = field === "campaignID" ? "deleted campaign" : "deleted coupon";
+
+
+              if (!fieldCounts[fieldValue]) {
+                fieldCounts[fieldValue] = 0;
+              }
+              fieldCounts[fieldValue]++;
+              console.log("Updated redemption count for Deleted coupon:", fieldCounts[fieldValue]);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user inventories or coupons:", error);
+    }
+  } else if (collectionName === "couponFRFR" && metric === "Count of coupons") {
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      let fieldValue = data[field];
+
+      if (field === "campaignID" && fieldValue) {
+        fieldValue = await getCampaignName(fieldValue);
+      }
+
+      if (fieldValue) {
+        if (!fieldCounts[fieldValue]) {
+          fieldCounts[fieldValue] = 0;
+        }
+        fieldCounts[fieldValue]++;
+      }
     }
   } else if (collectionName === "users" && metric === "Issuance count") {
     try {
@@ -620,7 +781,89 @@ export async function getCountOfDocumentsByField(
     } catch (error) {
       console.error("Error fetching notifications or receivers:", error);
     }
-  } else if (collectionName === "couponFRFR" && metric === "Redemption count") {
+  } else if (collectionName === "vendors" && metric === "Issuance count") {
+    try {
+      const notificationsRef = collection(db, "notifications");
+      const notificationsSnapshot = await getDocs(notificationsRef);
+      console.log("Notifications fetched:", notificationsSnapshot.size);
+
+      for (const notificationDoc of notificationsSnapshot.docs) {
+        const notificationData = notificationDoc.data();
+        const campaignId = notificationData.campaignID;
+        if (!campaignId) {
+          console.warn(`Notification ${notificationDoc.id} has undefined campaignID`);
+          continue;
+        }
+
+        const campaignDocRef = firestoreDoc(db, "campaign", campaignId);
+        const campaignDoc = await getDoc(campaignDocRef);
+
+        if (campaignDoc.exists()) {
+          const campaignData = campaignDoc.data();
+          const vendorId = campaignData.vendorID;
+
+          if (!vendorId) {
+            console.warn(`Campaign ${campaignId} has undefined vendorID`);
+            const fieldValue = "deleted vendor";
+
+            if (!fieldCounts[fieldValue]) {
+              fieldCounts[fieldValue] = 0;
+            }
+            fieldCounts[fieldValue]++;
+            console.log("Updated issuance count for Deleted vendor:", fieldCounts[fieldValue]);
+            continue;
+          }
+
+          console.log(`Campaign ID ${campaignId} is associated with vendor ID: ${vendorId}`);
+
+          const vendorDocRef = firestoreDoc(db, "vendors", vendorId);
+          const vendorDoc = await getDoc(vendorDocRef);
+
+          if (vendorDoc.exists()) {
+            const vendorData = vendorDoc.data();
+            const fieldValue = vendorData[field];
+
+            console.log("Vendor data:", vendorData);
+            console.log("Field value:", fieldValue);
+
+            if (!fieldCounts[fieldValue]) {
+              fieldCounts[fieldValue] = 0;
+            }
+
+            const notifReceiversRef = collection(
+              db,
+              `notifications/${notificationDoc.id}/notifReceivers`
+            );
+            const notifReceiversSnapshot = await getDocs(notifReceiversRef);
+            console.log("Receivers for notification:", notificationDoc.id, ":", notifReceiversSnapshot.size);
+
+            fieldCounts[fieldValue] += notifReceiversSnapshot.size;
+            console.log("Updated count for fieldValue", fieldValue, ":", fieldCounts[fieldValue]);
+          } else {
+            console.log(`Vendor document for vendor ID ${vendorId} does not exist.`);
+            const fieldValue = "deleted vendor";
+
+            if (!fieldCounts[fieldValue]) {
+              fieldCounts[fieldValue] = 0;
+            }
+            fieldCounts[fieldValue]++;
+            console.log("Updated issuance count for Deleted vendor:", fieldCounts[fieldValue]);
+          }
+        } else {
+          console.log(`Campaign document for campaign ID ${campaignId} does not exist.`);
+          const fieldValue = "deleted campaign";
+
+          if (!fieldCounts[fieldValue]) {
+            fieldCounts[fieldValue] = 0;
+          }
+          fieldCounts[fieldValue]++;
+          console.log("Updated issuance count for Deleted campaign:", fieldCounts[fieldValue]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching notifications or receivers:", error);
+    }
+  } else if (collectionName === "vendors" && metric === "Redemption count") {
     try {
       const usersRef = collection(db, "users");
       const usersSnapshot = await getDocs(usersRef);
@@ -630,24 +873,74 @@ export async function getCountOfDocumentsByField(
         const userId = userDoc.id;
         const userInventoryRef = collection(db, `users/${userId}/inventory`);
         const userInventorySnapshot = await getDocs(userInventoryRef);
+        console.log(`User ${userId} inventory items fetched:`, userInventorySnapshot.size);
 
         for (const inventoryDoc of userInventorySnapshot.docs) {
           const inventoryData = inventoryDoc.data();
           if (inventoryData.redeemed) {
-            const couponId = inventoryDoc.id;
-            const couponDocRef = firestoreDoc(db, "couponFRFR", couponId);
-            const couponDoc = await getDoc(couponDocRef);
+            const campaignId = inventoryData.campaignID;
+            if (!campaignId) {
+              console.warn(`Inventory item ${inventoryDoc.id} has undefined campaignID`);
+              continue;
+            }
+            console.log(`Inventory item ${inventoryDoc.id} is redeemed. Campaign ID: ${campaignId}`);
 
-            if (couponDoc.exists()) {
-              const couponData = couponDoc.data();
-              const fieldValue = couponData[field];
+            const campaignDocRef = firestoreDoc(db, "campaign", campaignId);
+            const campaignDoc = await getDoc(campaignDocRef);
+
+            if (campaignDoc.exists()) {
+              const campaignData = campaignDoc.data();
+              const vendorId = campaignData.vendorID;
+
+              if (!vendorId) {
+                console.warn(`Campaign ${campaignId} has undefined vendorID`);
+                const fieldValue = "deleted vendor";
+
+                if (!fieldCounts[fieldValue]) {
+                  fieldCounts[fieldValue] = 0;
+                }
+                fieldCounts[fieldValue]++;
+                console.log("Updated redemption count for Deleted vendor:", fieldCounts[fieldValue]);
+                continue;
+              }
+
+              console.log(`Campaign ID ${campaignId} is associated with vendor ID: ${vendorId}`);
+
+              const vendorDocRef = firestoreDoc(db, "vendors", vendorId);
+              const vendorDoc = await getDoc(vendorDocRef);
+
+              if (vendorDoc.exists()) {
+                const vendorData = vendorDoc.data();
+                const fieldValue = vendorData[field];
+
+                console.log("Vendor data:", vendorData);
+                console.log("Field value:", fieldValue);
+
+                if (!fieldCounts[fieldValue]) {
+                  fieldCounts[fieldValue] = 0;
+                }
+
+                fieldCounts[fieldValue]++;
+                console.log("Updated redemption count for fieldValue", fieldValue, ":", fieldCounts[fieldValue]);
+              } else {
+                console.log(`Vendor document for vendor ID ${vendorId} does not exist.`);
+                const fieldValue = "deleted vendor";
+
+                if (!fieldCounts[fieldValue]) {
+                  fieldCounts[fieldValue] = 0;
+                }
+                fieldCounts[fieldValue]++;
+                console.log("Updated redemption count for Deleted vendor:", fieldCounts[fieldValue]);
+              }
+            } else {
+              console.log(`Campaign document for campaign ID ${campaignId} does not exist.`);
+              const fieldValue = "deleted campaign";
 
               if (!fieldCounts[fieldValue]) {
                 fieldCounts[fieldValue] = 0;
               }
-
               fieldCounts[fieldValue]++;
-              console.log("Updated redemption count for fieldValue", fieldValue, ":", fieldCounts[fieldValue]);
+              console.log("Updated redemption count for Deleted vendor:", fieldCounts[fieldValue]);
             }
           }
         }
@@ -658,9 +951,21 @@ export async function getCountOfDocumentsByField(
   } else {
     for (const doc of snapshot.docs) {
       const data = doc.data();
-      const fieldValue = data[field];
+      let fieldValue = data[field];
 
-      if (field) {
+      if (field === "campaignID" && fieldValue) {
+        fieldValue = await getCampaignName(fieldValue);
+      }
+
+      if (field === "vendorID" && fieldValue) {
+        fieldValue = await getVendorName(fieldValue);
+      }
+
+      if (field === "orgID" && fieldValue) {
+        fieldValue = await getOrgName(fieldValue);
+      }
+
+      if (fieldValue) {
         if (isTimeField && duration) {
           const fieldDate = (data[field] as Timestamp).toDate();
           if (fieldDate >= duration.start && fieldDate <= duration.end) {
@@ -671,87 +976,10 @@ export async function getCountOfDocumentsByField(
             fieldCounts[dateKey]++;
           }
         } else {
-          if (fieldValue) {
-            switch (collectionName) {
-              case "campaign":
-                if (metric === "Count of campaigns") {
-                  if (!fieldCounts[fieldValue]) {
-                    fieldCounts[fieldValue] = 0;
-                  }
-                  fieldCounts[fieldValue]++;
-                } else if (metric === "Average duration of campaigns") {
-                  const validFrom = (data["validFrom"] as Timestamp).toDate();
-                  const validTo = (data["validTo"] as Timestamp).toDate();
-                  const duration = (validTo.getTime() - validFrom.getTime()) / (1000 * 60 * 60 * 24);
-
-                  if (!fieldDurations[fieldValue]) {
-                    fieldDurations[fieldValue] = [];
-                  }
-                  fieldDurations[fieldValue].push(duration);
-                }
-                break;
-              case "couponFRFR":
-                if (metric === "Count of coupons") {
-                  if (!fieldCounts[fieldValue]) {
-                    fieldCounts[fieldValue] = 0;
-                  }
-                  fieldCounts[fieldValue]++;
-                }
-                break;
-              case "users":
-                switch (metric) {
-                  case "Redemption count":
-                    const userInventoryRef = collection(
-                      db,
-                      `users/${doc.id}/inventory`
-                    );
-                    const userInventorySnapshot = await getDocs(userInventoryRef);
-
-                    userInventorySnapshot.forEach((inventoryDoc) => {
-                      const inventoryData = inventoryDoc.data();
-                      if (inventoryData.redeemed) {
-                        if (!fieldCounts[fieldValue]) {
-                          fieldCounts[fieldValue] = 0;
-                        }
-                        fieldCounts[fieldValue]++;
-                      }
-                    });
-                    break;
-
-                  case "Count of users":
-                    if (!fieldCounts[fieldValue]) {
-                      fieldCounts[fieldValue] = 0;
-                    }
-                    fieldCounts[fieldValue]++;
-                    break;
-
-                  default:
-                    break;
-                }
-                break;
-
-              case "organizations":
-                if (metric === "Count of organizations") {
-                  if (!fieldCounts[fieldValue]) {
-                    fieldCounts[fieldValue] = 0;
-                  }
-                  fieldCounts[fieldValue]++;
-                }
-                break;
-
-              case "vendors":
-                if (metric === "Count of vendors") {
-                  if (!fieldCounts[fieldValue]) {
-                    fieldCounts[fieldValue] = 0;
-                  }
-                  fieldCounts[fieldValue]++;
-                }
-                break;
-
-              default:
-                break;
-            }
+          if (!fieldCounts[fieldValue]) {
+            fieldCounts[fieldValue] = 0;
           }
+          fieldCounts[fieldValue]++;
         }
       }
     }
@@ -767,6 +995,13 @@ export async function getCountOfDocumentsByField(
 
   return fieldCounts;
 }
+
+
+
+
+
+
+
 
 
 

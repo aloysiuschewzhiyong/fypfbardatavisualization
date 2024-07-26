@@ -132,7 +132,7 @@ const ActivityCard: React.FC<AuditProps> = (props) => {
           </div>
         </div>
       </section>
-      <div className="flex flex-col items-end">
+      <div className="flex flex-col items-start sm:items-end">
         <p className="font-medium text-sm sm:text-sm md:text-md lg:text-md xl:text-md">
           {getActionDescription()}
         </p>

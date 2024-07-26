@@ -89,7 +89,7 @@ export function OrgChart() {
           dataKey="value"
           nameKey="name"
           innerRadius={55}
-          outerRadius={80}
+          outerRadius={75}
           label
           labelLine={false}
         >

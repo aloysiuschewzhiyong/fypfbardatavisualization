@@ -64,7 +64,7 @@ import {
 type Props = {};
 
 interface CollectionOptions {
-  dimensions: string[];
+  dimensions: { key: string, label: string }[];
   metrics: string[];
 }
 
@@ -73,24 +73,45 @@ interface Item {
   value: number;
 }
 
+interface CollectionOptions {
+  dimensions: { key: string, label: string }[];
+  metrics: string[];
+}
+
 const collectionOptions: { [key: string]: CollectionOptions } = {
   Campaigns: {
-    dimensions: ["vendorID", "orgID", "campaignName"],
+    dimensions: [
+      { key: "vendorID", label: "Vendor" },
+      { key: "orgID", label: "Organization" },
+      { key: "campaignName", label: "Campaign" }
+    ],
     metrics: ["Count of campaigns", "Average duration of campaigns"],
   },
   Coupons: {
-    dimensions: ["couponName", "campaignID"],
+    dimensions: [
+      { key: "couponName", label: "Coupon" },
+      { key: "campaignID", label: "Campaign" }
+    ],
     metrics: ["Count of coupons", "Issuance count", "Redemption count"],
   },
   Users: {
-    dimensions: ["username", "email", "role", "organization"],
+    dimensions: [
+      { key: "username", label: "Username" },
+      { key: "email", label: "Email" },
+      { key: "role", label: "Role" },
+      { key: "organization", label: "Organization" }
+    ],
     metrics: ["Count of users", "Issuance count", "Redemption count"],
   },
   Vendors: {
-    dimensions: ["vendorName", "locationType"],
-    metrics: ["Count of vendors"],
+    dimensions: [
+      { key: "vendorName", label: "Vendor" },
+      { key: "locationType", label: "Location Type" }
+    ],
+    metrics: ["Count of vendors", "Issuance count", "Redemption count"],
   },
 };
+
 
 const collectionNameMapping: { [key: string]: string } = {
   Campaigns: "campaign",
@@ -109,15 +130,15 @@ const getRandomColor = () => {
   return color;
 };
 
-export default function DataPage({}: Props) {
+export default function DataPage({ }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any | null>(null);
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
   const [collections, setCollections] = useState<string[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [collectionData, setCollectionData] = useState<Item[]>([]);
-  const [dimensions, setDimensions] = useState<string[]>([]);
-  const [selectedDimension, setSelectedDimension] = useState<string | null>(null);
+  const [dimensions, setDimensions] = useState<{ key: string, label: string }[]>([]);
+  const [selectedDimension, setSelectedDimension] = useState<{ key: string, label: string } | null>(null);
   const [metrics, setMetrics] = useState<string[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<string>("bar");
@@ -175,22 +196,22 @@ export default function DataPage({}: Props) {
     }
   }, [selectedCollection]);
 
-  const fetchCollectionData = async (collection: string, dimension: string, metric: string) => {
+  const fetchCollectionData = async (collection: string, dimension: { key: string, label: string }, metric: string) => {
     try {
       console.log("Fetching data for:", { collection, dimension, metric });
       const actualCollectionName = collectionNameMapping[collection];
       const data = await getCountOfDocumentsByField(
         actualCollectionName,
-        dimension,
+        dimension.key,
         metric
       );
       setCollectionData(
         Object.entries(data).map(([key, value]) => ({ name: key, value }))
       );
-      console.log(`Data for ${collection} with dimension ${dimension} and metric ${metric}:`, data);
+      console.log(`Data for ${collection} with dimension ${dimension.label} and metric ${metric}:`, data);
       setColors(Object.keys(data).map(() => getRandomColor()));
     } catch (error) {
-      console.error(`Error fetching data for collection ${collection} with dimension ${dimension} and metric ${metric}:`, error);
+      console.error(`Error fetching data for collection ${collection} with dimension ${dimension.label} and metric ${metric}:`, error);
     }
   };
 
@@ -402,7 +423,8 @@ export default function DataPage({}: Props) {
                 <Label>Select dimension</Label>
                 <Select
                   onValueChange={(value) => {
-                    setSelectedDimension(value);
+                    const dimension = dimensions.find(d => d.key === value);
+                    setSelectedDimension(dimension || null);
                     setSelectedMetric(null);
                   }}
                 >
@@ -413,8 +435,8 @@ export default function DataPage({}: Props) {
                     <SelectScrollUpButton />
                     <SelectGroup>
                       {dimensions.map((dimension) => (
-                        <SelectItem key={dimension} value={dimension}>
-                          {dimension}
+                        <SelectItem key={dimension.key} value={dimension.key}>
+                          {dimension.label}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -427,7 +449,7 @@ export default function DataPage({}: Props) {
             {selectedDimension && (
               <div className="space-y-3">
                 <Label>Select metric</Label>
-                <Select key={selectedDimension} onValueChange={setSelectedMetric}>
+                <Select key={selectedDimension.key} onValueChange={setSelectedMetric}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Select a metric" />
                   </SelectTrigger>
@@ -456,7 +478,7 @@ export default function DataPage({}: Props) {
                   <SelectContent>
                     <SelectScrollUpButton />
                     <SelectGroup>
-                    <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       <SelectItem value="ascending">Ascending</SelectItem>
                       <SelectItem value="descending">Descending</SelectItem>
                     </SelectGroup>
@@ -496,7 +518,7 @@ export default function DataPage({}: Props) {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>{selectedDimension}</TableHead>
+                            <TableHead>{selectedDimension.label}</TableHead>
                             <TableHead>{selectedMetric}</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -545,7 +567,7 @@ export default function DataPage({}: Props) {
                               radius={[6, 6, 0, 0]}
                               name={getLegendName()}
                             >
-                            <LabelList dataKey="value" position="top" />
+                              <LabelList dataKey="value" position="top" />
                             </Bar>
                           </BarChart>
                         </ChartContainer>
