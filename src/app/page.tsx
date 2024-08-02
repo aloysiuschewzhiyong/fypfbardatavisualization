@@ -7,19 +7,18 @@ import {
   getTotalNotificationReceiversRealtime,
   getActiveCampaignCounts,
   getAuditInfoRealtime,
-  getCouponUserCountsRedeemed,
   getActiveUsersInPastTwoHours,
+  getMonthlyRedemptionCount, // Import the function
   AuditData,
 } from "@/app/firebase"; // Adjust the import path as needed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import DashboardGraph from "@/components/ui/DashboardGraph";
-import { OrgChart } from "@/components/ui/OrgChart";
-import CouponChart from "@/components/ui/CouponChart";
-import CampaignChart from "@/components/ui/CampaignGraph";
-import CouponRedemptionChart from "@/components/ui/CouponRedemptionGraph";
-import ActivityCard, { AuditProps } from "@/components/ui/ActivityCard";
-import CouponIssuanceChart from "@/components/ui/CouponIssuanceGraph";
 import PageTitle from "@/components/ui/PageTitle";
+import CouponRedemptionChart from "@/components/ui/CouponRedemptionGraph";
+import CouponIssuanceChart from "@/components/ui/CouponIssuanceGraph";
+import CampaignChart from "@/components/ui/CampaignGraph";
+import CouponChart from "@/components/ui/CouponChart";
+import { OrgChart } from "@/components/ui/OrgChart";
+import ActivityCard, { AuditProps } from "@/components/ui/ActivityCard";
 
 const HomeContent: React.FC = () => {
   const router = useRouter();
@@ -92,24 +91,36 @@ const HomeContent: React.FC = () => {
 
     const fetchRedeemedCoupons = async () => {
       try {
-        const couponCounts = await getCouponUserCountsRedeemed();
-        const totalRedeemed = Object.values(couponCounts).reduce((acc, count) => acc + count, 0);
+        const redemptionData = await getMonthlyRedemptionCount();
 
-        // Assuming you have the counts for last month to calculate percentage difference
-        // For demonstration, let's assume last month's redeemed coupons count was 0
-        const lastMonthRedeemed = 0; // This should be dynamically fetched or passed
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const currentYear = now.getFullYear();
+        const previousMonthYear = previousMonth === 11 ? currentYear - 1 : currentYear;
 
-        let percentageDiff;
-        if (lastMonthRedeemed === 0) {
-          percentageDiff = totalRedeemed > 0 ? totalRedeemed * 100 : 0; // If last month was zero and this month is greater than zero, show 100% increase
-        } else {
-          percentageDiff = ((totalRedeemed - lastMonthRedeemed) / lastMonthRedeemed) * 100;
-        }
+        const currentMonthData = redemptionData.find(data => {
+          const date = new Date(`${data.month} ${currentYear}`);
+          return date.getMonth() === currentMonth;
+        });
 
-        console.log('Total Redeemed Coupons:', totalRedeemed); // Log total redeemed coupons
+        const previousMonthData = redemptionData.find(data => {
+          const date = new Date(`${data.month} ${previousMonthYear}`);
+          return date.getMonth() === previousMonth;
+        });
+
+        const currentMonthCount = currentMonthData ? currentMonthData.redemptions : 0;
+        const previousMonthCount = previousMonthData ? previousMonthData.redemptions : 0;
+
+        const percentageDiff = previousMonthCount === 0
+          ? currentMonthCount * 100
+          : ((currentMonthCount - previousMonthCount) / previousMonthCount) * 100;
+
+        console.log('Previous Month Redeemed Coupons:', previousMonthCount); // Log previous month count
+        console.log('Current Month Redeemed Coupons:', currentMonthCount); // Log current month count
         console.log('Percentage Difference in Redeemed Coupons:', percentageDiff); // Log percentage difference
 
-        setRedeemedCoupons(totalRedeemed);
+        setRedeemedCoupons(currentMonthCount);
         setRedeemedCouponsPercentageDifference(percentageDiff);
       } catch (error) {
         console.error("Error fetching redeemed coupons:", error);
